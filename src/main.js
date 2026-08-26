@@ -1,0 +1,2359 @@
+import './style.css';
+import { SecureCrypto } from './crypto.js';
+import { DB } from './db.js';
+import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
+import * as mammoth from 'mammoth';
+
+
+
+// DOM Elements
+const fileList = document.getElementById('file-list');
+const addFileBtn = document.getElementById('add-file-btn');
+const authModal = document.getElementById('auth-modal');
+const viewer = document.getElementById('viewer');
+const viewerDownloadBtn = document.getElementById('viewer-download-btn');
+const fileInput = document.getElementById('file-input');
+const privacyCurtain = document.getElementById('privacy-curtain');
+
+// Feature Elements
+const themeToggle = document.getElementById('theme-toggle');
+const searchInput = document.getElementById('search-input');
+const sortSelect = document.getElementById('sort-select');
+const storageText = document.getElementById('storage-text');
+const storageFill = document.getElementById('storage-fill');
+const bulkActions = document.getElementById('bulk-actions');
+const selectedCount = document.getElementById('selected-count');
+const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+const cancelSelectBtn = document.getElementById('cancel-select-btn');
+const infoModal = document.getElementById('info-modal');
+const renameModal = document.getElementById('rename-modal');
+const strengthBar = document.getElementById('strength-bar');
+const strengthText = document.getElementById('strength-text');
+
+// New Feature Elements
+
+const bulkExportBtn = document.getElementById('bulk-export-btn');
+const recentSection = document.getElementById('recent-section');
+const recentScroll = document.getElementById('recent-scroll');
+const dropZone = document.getElementById('drop-zone');
+const statTotal = document.getElementById('stat-total');
+const statImages = document.getElementById('stat-images');
+const statVideos = document.getElementById('stat-videos');
+const statSize = document.getElementById('stat-size');
+const settingsModal = document.getElementById('settings-modal');
+const changePassModal = document.getElementById('change-pass-modal');
+
+const settingsBtn = document.getElementById('settings-btn');
+const helpBtn = document.getElementById('help-btn');
+const helpModal = document.getElementById('help-modal');
+
+// State
+let selectedFileForAuth = null;
+let currentDecryptedUrl = null;
+let currentViewOnceId = null;
+let allFiles = [];
+let selectedFiles = new Set();
+let currentRenameFileId = null;
+let currentInfoFileId = null;
+let recentlyViewed = JSON.parse(localStorage.getItem('sv_recent') || '[]');
+let autoLockTimer = null;
+let isGridView = false;
+let currentChangePassFileId = null;
+
+let currentShareFileId = null;
+let failedAttempts = {};
+let appLockPassword = localStorage.getItem('sv_app_lock') || null;
+// State variables for removed settings are no longer needed
+// let privacyBlur = localStorage.getItem('sv_privacy_blur') !== 'false';
+// let showExtensions = localStorage.getItem('sv_show_ext') !== 'false';
+// let reducedMotion = localStorage.getItem('sv_motion') === 'true';
+// let isCompact = localStorage.getItem('sv_compact') === 'true';
+// let hideThumbnails = localStorage.getItem('sv_hide_thumbs') === 'true';
+
+// Keeping these as default values in code if they are referenced elsewhere, or removing them completely if safely possible.
+// For now, I will hardcode values where they were used, or let's see. 
+// Actually, it's cleaner to remove them and update logic to behave as "standard" (true/false) where appropriate.
+
+// Re-evaluating: The user wants to REMOVE the features. 
+// "Show File Extensions" removed -> implies default behavior (show or hide?). Usually show is better or just filename as is.
+// "Compact View" removed -> implies standard view.
+// "Hide File Icons" removed -> implies show icons.
+// "Reduced Motion" removed -> implies animations enabled.
+// "Privacy Curtain" removed -> implies no blur on tab switch.
+
+// So I won't define them as variables. I'll just remove the lines.
+let autoLockTimeout = parseInt(localStorage.getItem('sv_autolock') || '300000');
+
+// --- Mobile-Friendly Custom Dialogs ---
+
+/**
+ * Custom prompt dialog (mobile-friendly replacement for browser prompt())
+ * @param {string} title - Dialog title
+ * @param {string} message - Description message
+ * @param {Object} options - Optional settings { inputType: 'text'|'password', placeholder: string }
+ * @returns {Promise<string|null>} - User input or null if cancelled
+ */
+function showPrompt(title, message = '', options = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('custom-prompt-modal');
+    const titleEl = document.getElementById('prompt-title');
+    const messageEl = document.getElementById('prompt-message');
+    const inputEl = document.getElementById('prompt-input');
+    const confirmBtn = document.getElementById('prompt-confirm');
+    const cancelBtn = document.getElementById('prompt-cancel');
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    inputEl.type = options.inputType || 'text';
+    inputEl.placeholder = options.placeholder || 'Enter value...';
+    inputEl.value = '';
+
+    const cleanup = () => {
+      modal.close();
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+      inputEl.onkeydown = null;
+    };
+
+    confirmBtn.onclick = () => {
+      const value = inputEl.value;
+      cleanup();
+      resolve(value || null);
+    };
+
+    cancelBtn.onclick = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    inputEl.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmBtn.click();
+      }
+    };
+
+    modal.showModal();
+    setTimeout(() => inputEl.focus(), 100);
+  });
+}
+
+/**
+ * Custom confirm dialog (mobile-friendly replacement for browser confirm())
+ * @param {string} title - Dialog title
+ * @param {string} message - Confirmation message
+ * @returns {Promise<boolean>} - true if confirmed, false if cancelled
+ */
+function showConfirm(title, message = '') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('custom-confirm-modal');
+    const titleEl = document.getElementById('confirm-title');
+    const messageEl = document.getElementById('confirm-message');
+    const okBtn = document.getElementById('confirm-ok');
+    const cancelBtn = document.getElementById('confirm-cancel');
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+
+    let resolved = false;
+
+    const cleanup = () => {
+      modal.close();
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      modal.removeEventListener('click', backdropHandler);
+      modal.removeEventListener('close', closeHandler);
+    };
+
+    const backdropHandler = (event) => {
+      // If click is on the modal backdrop (not the content)
+      if (event.target === modal && !resolved) {
+        resolved = true;
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    const closeHandler = () => {
+      // Handle ESC key or other close methods
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    okBtn.onclick = () => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve(true);
+      }
+    };
+
+    cancelBtn.onclick = () => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    modal.addEventListener('click', backdropHandler);
+    modal.addEventListener('close', closeHandler);
+
+    modal.showModal();
+  });
+}
+
+/**
+ * Custom alert dialog (mobile-friendly replacement for browser alert())
+ * @param {string} title - Dialog title
+ * @param {string} message - Alert message
+ * @returns {Promise<void>}
+ */
+function showAlert(title, message = '') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('custom-alert-modal');
+    const titleEl = document.getElementById('alert-title');
+    const messageEl = document.getElementById('alert-message');
+    const okBtn = document.getElementById('alert-ok');
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+
+    const cleanup = () => {
+      modal.close();
+      okBtn.onclick = null;
+    };
+
+    okBtn.onclick = () => {
+      cleanup();
+      resolve();
+    };
+
+    modal.showModal();
+  });
+}
+
+// --- Initialization ---
+
+async function init() {
+  checkAppLock();
+  loadTheme();
+  loadSettings();
+  await renderFileList();
+  setupEventListeners();
+
+  checkCrashRecovery();
+  renderRecentlyViewed();
+  startAutoLockTimer();
+  updatePanicVisibility(); // Initial check
+}
+
+init();
+
+// --- Event Listeners ---
+
+function setupEventListeners() {
+  document.getElementById('cancel-add').addEventListener('click', () => {
+    resetAddForm();
+  });
+  document.getElementById('confirm-add').addEventListener('click', handleAddFile);
+
+  document.getElementById('cancel-auth').addEventListener('click', () => {
+    authModal.close();
+    document.getElementById('auth-password').value = '';
+    selectedFileForAuth = null;
+  });
+  document.getElementById('confirm-auth').addEventListener('click', handleAuthSubmit);
+  document.getElementById('close-viewer').addEventListener('click', closeViewer);
+
+  // Feature Listeners
+  themeToggle?.addEventListener('click', toggleTheme);
+  searchInput?.addEventListener('input', handleSearch);
+  sortSelect?.addEventListener('change', handleSort);
+  document.getElementById('new-password')?.addEventListener('input', updatePasswordStrength);
+
+  // Bulk Actions
+  bulkDeleteBtn?.addEventListener('click', handleBulkDelete);
+  bulkExportBtn?.addEventListener('click', handleBulkExport);
+  cancelSelectBtn?.addEventListener('click', cancelBulkSelect);
+  document.getElementById('select-all-btn')?.addEventListener('click', handleSelectAll);
+
+  // Modals
+  document.getElementById('close-info')?.addEventListener('click', () => infoModal.close());
+  document.getElementById('cancel-rename')?.addEventListener('click', () => renameModal.close());
+  document.getElementById('confirm-rename')?.addEventListener('click', handleRename);
+
+
+
+
+
+  // Drag & Drop
+  setupDragDrop();
+
+  // Keyboard Shortcuts
+  setupKeyboardShortcuts();
+
+  // Auto-lock reset on activity
+  ['click', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+    document.addEventListener(event, resetAutoLockTimer, { passive: true });
+  });
+
+  // Help Modal
+  helpBtn?.addEventListener('click', () => helpModal?.showModal());
+  document.getElementById('close-help')?.addEventListener('click', () => helpModal?.close());
+
+  // Click outside modal to close (backdrop click)
+  setupModalBackdropClose();
+
+  // Settings Modal
+  settingsBtn?.addEventListener('click', () => {
+    loadSettings();
+    settingsModal?.showModal();
+  });
+  document.getElementById('close-settings')?.addEventListener('click', () => settingsModal?.close());
+  document.getElementById('close-settings-x')?.addEventListener('click', () => settingsModal?.close());
+
+  document.getElementById('set-app-lock')?.addEventListener('click', handleSetAppLock);
+  document.getElementById('remove-app-lock')?.addEventListener('click', handleRemoveAppLock);
+  document.getElementById('set-recovery')?.addEventListener('click', handleSetRecovery);
+  document.getElementById('forgot-password-btn')?.addEventListener('click', handleForgotPassword);
+
+  document.getElementById('feedback-btn')?.addEventListener('click', () => {
+    const email = "coralgenz@zohomail.in";
+    const subject = encodeURIComponent("SecureVault Feedback");
+    const body = encodeURIComponent("Hi team,\n\nI have some feedback for SecureVault:\n");
+
+    // Attempt to open mail client
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+
+    // Optional: You could show a toast here, but mailto action is usually immediate.
+  });
+
+
+
+  // Panic Button Listeners
+  document.getElementById('panic-btn')?.addEventListener('click', triggerPanic);
+  document.getElementById('panic-action-select')?.addEventListener('change', async (e) => {
+    const newValue = e.target.value;
+    const oldValue = localStorage.getItem('sv_panic_action') || 'blur';
+
+    // Ask for confirmation
+    const confirmed = await showConfirm('Change Panic Action', `Set panic action to "${e.target.options[e.target.selectedIndex].text}"?`);
+
+    if (confirmed) {
+      localStorage.setItem('sv_panic_action', newValue);
+      await showAlert('Saved', 'Panic button action updated.');
+    } else {
+      // Revert to old value
+      e.target.value = oldValue;
+    }
+  });
+
+  // Panic Enable Toggle
+  document.getElementById('panic-enable-toggle')?.addEventListener('change', (e) => {
+    const isEnabled = e.target.checked;
+    localStorage.setItem('sv_panic_enabled', isEnabled);
+    updatePanicVisibility();
+    if (isEnabled) {
+      showAlert('Panic Button Enabled', 'The panic button is now visible in the header.');
+    }
+  });
+
+  // Download Permission Toggles
+  document.getElementById('dl-media-toggle')?.addEventListener('change', (e) => {
+    localStorage.setItem('sv_dl_media', e.target.checked);
+  });
+  document.getElementById('dl-doc-toggle')?.addEventListener('change', (e) => {
+    localStorage.setItem('sv_dl_doc', e.target.checked);
+  });
+
+  document.getElementById('auto-lock-time')?.addEventListener('change', updateAutoLockTime);
+
+  // Change Password Modal
+  document.getElementById('cancel-change-pass')?.addEventListener('click', () => changePassModal?.close());
+  document.getElementById('confirm-change-pass')?.addEventListener('click', handleChangePassword);
+
+
+
+  // Share Modal
+  const shareModal = document.getElementById('share-modal');
+  document.getElementById('cancel-share')?.addEventListener('click', () => shareModal?.close());
+  document.getElementById('confirm-share')?.addEventListener('click', handleShareConfirm);
+
+  document.getElementById('share-logo')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    const textEl = document.getElementById('share-logo-text');
+    if (textEl) {
+      textEl.textContent = file ? file.name : 'Choose File';
+    }
+  });
+
+  // Security Monitoring (Privacy Curtain Removed as per request)
+  // document.addEventListener('visibilitychange', handleVisibilityChange);
+  // window.addEventListener('blur', () => enablePrivacyCurtain());
+  // window.addEventListener('focus', () => disablePrivacyCurtain());
+
+  // File Upload Zone - Show preview when file selected
+  fileInput?.addEventListener('change', handleFileSelect);
+
+  // File remove button
+  document.getElementById('file-remove-btn')?.addEventListener('click', removeSelectedFile);
+
+  // Drag over effects for upload zone
+  const uploadZone = document.getElementById('file-upload-zone');
+  uploadZone?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('drag-over');
+  });
+  uploadZone?.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('drag-over');
+  });
+  uploadZone?.addEventListener('drop', () => {
+    uploadZone.classList.remove('drag-over');
+  });
+
+  // Prevent Screenshots/Context Menu
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (e.key === 'PrintScreen' || (e.ctrlKey && e.key === 'p')) {
+      e.preventDefault();
+      alert('Screenshots are disabled');
+    }
+  });
+}
+
+
+
+function resetAddForm() {
+  fileInput.value = '';
+  document.getElementById('new-password').value = '';
+
+  strengthBar.className = 'strength-bar';
+  strengthText.innerText = 'Enter a password';
+
+  // Reset file preview
+  const uploadZone = document.getElementById('file-upload-zone');
+  const filePreview = document.getElementById('file-preview');
+  uploadZone?.classList.remove('hidden');
+  filePreview?.classList.add('hidden');
+  document.getElementById('inline-password-section')?.classList.add('hidden');
+}
+
+// --- Feature: File Upload Preview ---
+function handleFileSelect() {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  // Limit file size to 150MB
+  const MAX_SIZE = 150 * 1024 * 1024; // 150 MB
+  if (file.size > MAX_SIZE) {
+    showAlert('File Too Large', 'Please select a file smaller than 150 MB.');
+    fileInput.value = ''; // Clear the input
+    return;
+  }
+
+  const uploadZone = document.getElementById('file-upload-zone');
+  const filePreview = document.getElementById('file-preview');
+  const filePreviewName = document.getElementById('file-preview-name');
+  const filePreviewSize = document.getElementById('file-preview-size');
+
+  // Update preview info
+  filePreviewName.textContent = file.name;
+  filePreviewSize.textContent = formatFileSize(file.size);
+
+  // Show preview, hide upload zone
+  uploadZone?.classList.add('hidden');
+  filePreview?.classList.remove('hidden');
+  document.getElementById('inline-password-section')?.classList.remove('hidden');
+}
+
+function removeSelectedFile(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  fileInput.value = '';
+
+  const uploadZone = document.getElementById('file-upload-zone');
+  const filePreview = document.getElementById('file-preview');
+
+  uploadZone?.classList.remove('hidden');
+  filePreview?.classList.add('hidden');
+  document.getElementById('inline-password-section')?.classList.add('hidden');
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// --- Feature: Excel Rendering ---
+function renderExcelToHTML(arrayBuffer, container) {
+  try {
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    const sheetNames = workbook.SheetNames;
+    if (sheetNames.length === 0) return;
+
+    const viewer = document.createElement('div');
+    viewer.className = 'excel-viewer';
+
+    const header = document.createElement('div');
+    header.className = 'excel-header';
+
+    const body = document.createElement('div');
+    body.className = 'excel-table-wrapper';
+
+    let activeSheet = sheetNames[0];
+
+    const renderSheet = (name) => {
+      body.innerHTML = '';
+      const sheet = workbook.Sheets[name];
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      if (!data || data.length === 0) {
+        body.innerHTML = '<div style="padding:20px;text-align:center;">Empty Sheet</div>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'excel-table';
+
+      data.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        row.forEach((cell) => {
+          const el = rowIndex === 0 ? 'th' : 'td';
+          const cellEl = document.createElement(el);
+          cellEl.textContent = cell !== undefined ? cell : '';
+          tr.appendChild(cellEl);
+        });
+        table.appendChild(tr);
+      });
+      body.appendChild(table);
+    };
+
+    sheetNames.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = `excel-sheet-btn ${name === activeSheet ? 'active' : ''}`;
+      btn.textContent = name;
+      btn.onclick = () => {
+        activeSheet = name;
+        renderSheet(name);
+        header.querySelectorAll('.excel-sheet-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      };
+      header.appendChild(btn);
+    });
+
+    renderSheet(activeSheet);
+    viewer.appendChild(header);
+    viewer.appendChild(body);
+    container.appendChild(viewer);
+
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<div style="padding:20px;color:red;">Error parsing Excel file: ${err.message}</div>`;
+  }
+}
+
+// --- Feature: Word Rendering ---
+async function renderWordToHTML(arrayBuffer, container) {
+  try {
+    const { value: html, messages } = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+
+    // Create viewer structure
+    const viewer = document.createElement('div');
+    viewer.className = 'word-viewer';
+
+    // Create document page
+    const doc = document.createElement('div');
+    doc.className = 'word-document';
+    doc.innerHTML = html;
+
+    viewer.appendChild(doc);
+    container.appendChild(viewer);
+
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<div style="padding:20px;color:red;">Error parsing Word file: ${err.message}</div>`;
+  }
+}
+
+// --- Feature: Click Outside Modal to Close ---
+function setupModalBackdropClose() {
+  // Get all dialog modals
+  const modals = document.querySelectorAll('dialog.modal');
+
+  modals.forEach(modal => {
+    modal.addEventListener('click', (e) => {
+      // Check if click is on the dialog backdrop (not on modal-content)
+      const rect = modal.getBoundingClientRect();
+      const isInDialog = (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      );
+
+      // If click is on the backdrop area (the dialog element itself, not its content)
+      if (e.target === modal) {
+        modal.close();
+
+        // Reset add form if it's the add modal
+        if (modal.id === 'add-modal') {
+          resetAddForm();
+        }
+      }
+    });
+  });
+}
+
+// --- Feature: Theme Toggle ---
+function loadTheme() {
+  const saved = localStorage.getItem('sv_theme');
+  if (saved === 'light') document.body.classList.add('light-theme');
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('light-theme');
+  const isLight = document.body.classList.contains('light-theme');
+  localStorage.setItem('sv_theme', isLight ? 'light' : 'dark');
+}
+
+// --- Feature: Password Strength ---
+function updatePasswordStrength() {
+  const pwd = document.getElementById('new-password').value;
+  let strength = 0;
+  if (pwd.length >= 6) strength++;
+  if (pwd.length >= 10) strength++;
+  if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) strength++;
+  if (/[0-9]/.test(pwd)) strength++;
+  if (/[^A-Za-z0-9]/.test(pwd)) strength++;
+
+  strengthBar.className = 'strength-bar';
+  if (strength <= 1) { strengthBar.classList.add('weak'); strengthText.innerText = 'Weak'; }
+  else if (strength === 2) { strengthBar.classList.add('fair'); strengthText.innerText = 'Fair'; }
+  else if (strength === 3) { strengthBar.classList.add('good'); strengthText.innerText = 'Good'; }
+  else { strengthBar.classList.add('strong'); strengthText.innerText = 'Strong 💪'; }
+}
+
+// --- Feature: Search ---
+function handleSearch() {
+  const query = searchInput.value.toLowerCase().trim();
+  renderFileList(query);
+}
+
+// --- Feature: Sort ---
+function handleSort() {
+  renderFileList(searchInput?.value || '');
+}
+
+// --- Feature: Storage Usage & Stats ---
+function updateStorageUsage(files) {
+  const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
+  const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
+  storageText.innerText = `${files.length} files • ${sizeMB} MB used`;
+  const percent = Math.min((totalSize / (500 * 1024 * 1024)) * 100, 100);
+  storageFill.style.width = percent + '%';
+
+  // Update stats dashboard
+  const images = files.filter(f => f.type?.startsWith('image')).length;
+  const videos = files.filter(f => f.type?.startsWith('video')).length;
+  if (statTotal) statTotal.innerText = files.length;
+  if (statImages) statImages.innerText = images;
+  if (statVideos) statVideos.innerText = videos;
+  if (statSize) statSize.innerText = sizeMB;
+}
+
+// --- Feature: Bulk Select ---
+function updateBulkUI() {
+  const selectAllBtn = document.getElementById('select-all-btn');
+  if (selectedFiles.size > 0) {
+    bulkActions.classList.remove('hidden');
+    selectedCount.innerText = `${selectedFiles.size} selected`;
+    // Toggle select all / deselect all label
+    if (selectAllBtn) {
+      if (selectedFiles.size >= allFiles.length && allFiles.length > 0) {
+        selectAllBtn.innerText = 'Deselect All';
+      } else {
+        selectAllBtn.innerText = 'Select All';
+      }
+    }
+  } else {
+    bulkActions.classList.add('hidden');
+  }
+}
+
+function handleSelectAll() {
+  if (selectedFiles.size >= allFiles.length && allFiles.length > 0) {
+    // Already all selected — deselect all
+    selectedFiles.clear();
+  } else {
+    // Select all files
+    allFiles.forEach(f => selectedFiles.add(f.id));
+  }
+  updateBulkUI();
+  renderFileList(searchInput?.value || '');
+}
+
+function cancelBulkSelect() {
+  selectedFiles.clear();
+  updateBulkUI();
+  renderFileList(searchInput?.value || '');
+}
+
+async function handleBulkDelete() {
+  const confirmed = await showConfirm('Delete Files', `Delete ${selectedFiles.size} file(s)? This cannot be undone.`);
+  if (!confirmed) return;
+  for (const id of selectedFiles) {
+    await DB.deleteFile(id);
+  }
+  selectedFiles.clear();
+  updateBulkUI();
+  renderFileList();
+  await showAlert('Success', 'Files deleted.');
+}
+
+async function handleBulkExport() {
+  if (selectedFiles.size === 0) return;
+  await showAlert('Export', `Exporting ${selectedFiles.size} files. Each will download separately.`);
+  for (const id of selectedFiles) {
+    const fileRecord = await DB.getFile(id);
+    if (fileRecord) {
+      // Trigger share for each
+      await handleShareFileById(id);
+    }
+  }
+  selectedFiles.clear();
+  updateBulkUI();
+  renderFileList();
+}
+
+// Helper for export by ID
+async function handleShareFileById(fileId) {
+  const fileRecord = await DB.getFile(fileId);
+  if (!fileRecord) return;
+  const result = await decryptFileForExport(fileRecord);
+  if (!result || !result.buffer) return;
+  const { buffer: decryptedBuffer, password: capturedPassword } = result;
+
+  // Prompt for the original password to use for the export only if we don't have it
+  let finalPassword = capturedPassword;
+  if (!finalPassword) {
+    finalPassword = await showPrompt('Share File', `Enter the file's password to protect this export:`, { inputType: 'password', placeholder: 'Enter original password...' });
+  }
+  if (!finalPassword) return;
+
+  const exportSalt = SecureCrypto.generateSalt();
+  const exportKey = await SecureCrypto.deriveKeyFromPassword(finalPassword, exportSalt, 600000);
+  const { iv, ciphertext } = await SecureCrypto.encryptData(exportKey, decryptedBuffer);
+
+  const blobToBase64 = (blob) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+  });
+
+  const base64Data = await blobToBase64(new Blob([ciphertext]));
+  const { header, footer } = generateSecureHTMLParts(fileRecord, exportSalt, iv);
+  const finalBlob = new Blob([header, base64Data, footer], { type: 'text/html' });
+  const url = URL.createObjectURL(finalBlob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileRecord.name + '.secure.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+
+// --- Feature: Export All ---
+
+// --- Feature: Drag & Drop ---
+function setupDragDrop() {
+  const app = document.getElementById('app');
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    app?.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone?.classList.remove('hidden');
+      dropZone?.classList.add('active');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    app?.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone?.classList.add('hidden');
+      dropZone?.classList.remove('active');
+    });
+  });
+
+  app?.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      if (files.length === 1) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        fileInput.files = dataTransfer.files;
+        handleFileSelect();
+        document.getElementById('inline-add-container')?.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        for (const file of files) {
+          await addFileFromDrop(file);
+        }
+      }
+    }
+  });
+}
+
+async function addFileFromDrop(file) {
+  // Limit file size to 150MB
+  const MAX_SIZE = 150 * 1024 * 1024; // 150 MB
+  if (file.size > MAX_SIZE) {
+    await showAlert('File Too Large', `File "${file.name}" is too large. Max 150 MB.`);
+    return;
+  }
+  const password = await showPrompt('Set Password', `Set password for: ${file.name}`, { inputType: 'password', placeholder: 'Enter secure password...' });
+  if (!password) return;
+
+  const fileKey = await SecureCrypto.generateKey();
+  const salt = SecureCrypto.generateSalt();
+  const passwordKey = await SecureCrypto.deriveKeyFromPassword(password, salt);
+  const fileBuffer = await file.arrayBuffer();
+  const { iv: fileIv, ciphertext } = await SecureCrypto.encryptData(fileKey, fileBuffer);
+  const { iv: wrapIv, wrappedData: wrappedWithPass } = await SecureCrypto.wrapKey(fileKey, passwordKey);
+
+  const fileRecord = {
+    id: crypto.randomUUID(),
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    date: Date.now(),
+    authMode: 'always',
+    keys: [{ type: 'password', salt, iv: wrapIv, data: wrappedWithPass }],
+    content: ciphertext,
+    iv: fileIv,
+    viewCount: 0
+  };
+
+  await DB.saveFile(fileRecord);
+  renderFileList();
+  await showAlert('Success', `${file.name} encrypted and saved!`);
+}
+
+// --- Feature: Keyboard Shortcuts ---
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + N = New file
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      // Inline add form used now
+    }
+    // Ctrl/Cmd + F = Focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      e.preventDefault();
+      searchInput?.focus();
+    }
+    // Escape = Close modals
+    if (e.key === 'Escape') {
+      resetAddForm();
+      authModal.close();
+      infoModal?.close();
+      renameModal?.close();
+    }
+    // Ctrl/Cmd + T = Toggle theme
+    if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+      e.preventDefault();
+      toggleTheme();
+    }
+  });
+}
+
+// --- Feature: Auto-Lock Timer ---
+// --- Feature: Auto-Lock Timer (Configurable) ---
+function startAutoLockTimer() {
+  resetAutoLockTimer();
+}
+
+function resetAutoLockTimer() {
+  if (autoLockTimer) clearTimeout(autoLockTimer);
+  if (autoLockTimeout > 0) {
+    autoLockTimer = setTimeout(triggerAutoLock, autoLockTimeout);
+  }
+}
+
+function triggerAutoLock() {
+  closeViewer();
+  if (appLockPassword) {
+    checkAppLock();
+  } else {
+    // Fallback if no password set but timeout reached
+    location.reload();
+  }
+}
+
+function updateAutoLockTime() {
+  const select = document.getElementById('auto-lock-time');
+  autoLockTimeout = parseInt(select?.value || '300000');
+  localStorage.setItem('sv_autolock', autoLockTimeout);
+  resetAutoLockTimer();
+}
+
+// --- Feature: Failed Attempts Lockout ---
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes
+
+function checkFileLocked(fileId) {
+  const attempt = failedAttempts[fileId];
+  if (attempt && attempt.locked && Date.now() < attempt.lockedUntil) {
+    const remaining = Math.ceil((attempt.lockedUntil - Date.now()) / 1000);
+    alert(`File locked. Try again in ${remaining} seconds.`);
+    return true;
+  }
+  return false;
+}
+
+function recordFailedAttempt(fileId) {
+  if (!failedAttempts[fileId]) {
+    failedAttempts[fileId] = { count: 0, locked: false, lockedUntil: 0 };
+  }
+  failedAttempts[fileId].count++;
+
+  const attemptsLeft = MAX_ATTEMPTS - failedAttempts[fileId].count;
+  const attemptsEl = document.getElementById('attempts-left');
+  const warningEl = document.getElementById('auth-attempts');
+
+  if (attemptsLeft <= 3) {
+    warningEl?.classList.remove('hidden');
+    if (attemptsEl) attemptsEl.innerText = attemptsLeft;
+  }
+
+  if (failedAttempts[fileId].count >= MAX_ATTEMPTS) {
+    failedAttempts[fileId].locked = true;
+    failedAttempts[fileId].lockedUntil = Date.now() + LOCKOUT_DURATION;
+    authModal.close();
+    alert('Too many failed attempts. File locked for 5 minutes.');
+  }
+}
+
+function clearFailedAttempts(fileId) {
+  delete failedAttempts[fileId];
+  document.getElementById('auth-attempts')?.classList.add('hidden');
+}
+
+// --- Feature: Change Password ---
+function openChangePasswordModal(e, fileId, fileName) {
+  e.stopPropagation();
+  currentChangePassFileId = fileId;
+  document.getElementById('change-pass-file').innerText = fileName;
+  document.getElementById('current-password').value = '';
+  document.getElementById('new-password-change').value = '';
+  document.getElementById('confirm-password-change').value = '';
+  changePassModal?.showModal();
+}
+
+async function handleChangePassword() {
+  const currentPass = document.getElementById('current-password').value;
+  const newPass = document.getElementById('new-password-change').value;
+  const confirmPass = document.getElementById('confirm-password-change').value;
+
+  if (!currentPass || !newPass || !confirmPass) {
+    await showAlert('Required', 'Please fill all fields');
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    await showAlert('Error', 'New passwords do not match');
+    return;
+  }
+
+  if (newPass.length < 4) {
+    await showAlert('Error', 'New password must be at least 4 characters');
+    return;
+  }
+
+  try {
+    const file = await DB.getFile(currentChangePassFileId);
+    if (!file) throw new Error('File not found');
+
+    const passKeyEntry = file.keys.find(k => k.type === 'password');
+    if (!passKeyEntry) throw new Error('No password key found');
+
+    // Verify current password
+    const currentPasswordKey = await SecureCrypto.deriveKeyFromPassword(currentPass, passKeyEntry.salt);
+    const fileKey = await SecureCrypto.unwrapKey(passKeyEntry.data, currentPasswordKey, passKeyEntry.iv);
+
+    // Create new password wrapper
+    const newSalt = SecureCrypto.generateSalt();
+    const newPasswordKey = await SecureCrypto.deriveKeyFromPassword(newPass, newSalt);
+    const { iv: newWrapIv, wrappedData: newWrappedKey } = await SecureCrypto.wrapKey(fileKey, newPasswordKey);
+
+    // Update file
+    file.keys = file.keys.filter(k => k.type !== 'password');
+    file.keys.push({ type: 'password', salt: newSalt, iv: newWrapIv, data: newWrappedKey });
+
+    // Add to access log
+    file.accessLog = file.accessLog || [];
+    file.accessLog.push({ action: 'password_changed', date: Date.now() });
+
+    await DB.updateFile(file);
+    changePassModal?.close();
+    await showAlert('Success', 'Password changed successfully!');
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Failed to change password. Current password may be incorrect.');
+  }
+}
+
+// --- Feature: Duplicate File ---
+async function duplicateFile(e, fileId) {
+  e.stopPropagation();
+
+  try {
+    const file = await DB.getFile(fileId);
+    if (!file) return;
+
+    const newFile = {
+      ...file,
+      id: crypto.randomUUID(),
+      name: file.name + ' (Copy)',
+      date: Date.now(),
+      accessLog: [{ action: 'created_copy', date: Date.now() }]
+    };
+
+    await DB.saveFile(newFile);
+    renderFileList();
+    await showAlert('Success', 'File duplicated!');
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Failed to duplicate file');
+  }
+}
+
+// --- Feature: Access Log ---
+function addAccessLog(file, action) {
+  file.accessLog = file.accessLog || [];
+  file.accessLog.push({ action, date: Date.now() });
+  if (file.accessLog.length > 20) {
+    file.accessLog = file.accessLog.slice(-20);
+  }
+}
+
+// --- Feature: Decoy Password ---
+function saveDecoyPassword() {
+  const pass = document.getElementById('decoy-password').value;
+  if (!pass) {
+    localStorage.removeItem('sv_decoy');
+    decoyPassword = null;
+    showAlert('Removed', 'Decoy password removed');
+  } else {
+    localStorage.setItem('sv_decoy', pass);
+    decoyPassword = pass;
+    showAlert('Saved', 'Decoy password saved! Using this password will show an empty vault.');
+  }
+  document.getElementById('decoy-password').value = '';
+}
+
+
+
+// --- Feature: Recently Viewed ---
+function addToRecentlyViewed(file) {
+  recentlyViewed = recentlyViewed.filter(r => r.id !== file.id);
+  recentlyViewed.unshift({ id: file.id, name: file.name, type: file.type, date: Date.now() });
+  if (recentlyViewed.length > 5) recentlyViewed = recentlyViewed.slice(0, 5);
+  localStorage.setItem('sv_recent', JSON.stringify(recentlyViewed));
+  renderRecentlyViewed();
+}
+
+function renderRecentlyViewed() {
+  if (!recentSection || !recentScroll) return;
+
+  // Filter out files that no longer exist
+  const validRecent = recentlyViewed.filter(r => allFiles.some(f => f.id === r.id));
+
+  if (validRecent.length === 0) {
+    recentSection.classList.add('hidden');
+    return;
+  }
+
+  recentSection.classList.remove('hidden');
+  recentScroll.innerHTML = validRecent.map(r => `
+    <div class="recent-item" data-id="${r.id}">
+      <span>${r.type?.startsWith('image') ? '🖼️' : r.type?.startsWith('video') ? '🎬' : '📄'}</span>
+      <span>${r.name}</span>
+    </div>
+  `).join('');
+
+  recentScroll.querySelectorAll('.recent-item').forEach(el => {
+    el.onclick = () => onFileClick(el.dataset.id);
+  });
+}
+
+// --- Feature: Delete Single File ---
+async function handleDeleteFile(e, fileId) {
+  e.stopPropagation();
+  const confirmed = await showConfirm('Delete File', 'Delete this file permanently?');
+  if (!confirmed) return;
+  await DB.deleteFile(fileId);
+  renderFileList();
+}
+
+// --- Feature: File Info ---
+async function showFileInfo(e, fileId) {
+  e.stopPropagation();
+  const file = allFiles.find(f => f.id === fileId);
+  if (!file) return;
+
+  document.getElementById('info-name').innerText = file.name;
+  document.getElementById('info-type').innerText = file.type || 'Unknown';
+  document.getElementById('info-size').innerText = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+  document.getElementById('info-date').innerText = new Date(file.date).toLocaleDateString();
+  document.getElementById('info-mode').innerText = file.authMode;
+
+  const viewsEl = document.getElementById('info-views');
+  if (viewsEl) {
+    viewsEl.innerText = file.viewCount || 0;
+  }
+
+  // Access Log
+  const logEl = document.getElementById('access-log');
+  if (logEl && file.accessLog && file.accessLog.length > 0) {
+    logEl.innerHTML = file.accessLog.slice(-10).reverse().map(log => `
+      <div class="access-log-item">
+        ${log.action.replace('_', ' ')} - ${new Date(log.date).toLocaleString()}
+      </div>
+    `).join('');
+  } else if (logEl) {
+    logEl.innerHTML = 'No access history';
+  }
+
+  infoModal.showModal();
+}
+
+// --- Feature: Rename ---
+function openRenameModal(e, fileId, currentName) {
+  e.stopPropagation();
+  currentRenameFileId = fileId;
+  const input = document.getElementById('rename-input');
+  input.value = currentName;
+  renameModal.showModal();
+  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 100);
+}
+
+async function handleRename() {
+  const newName = document.getElementById('rename-input').value.trim();
+  if (!newName || !currentRenameFileId) return;
+
+  const file = await DB.getFile(currentRenameFileId);
+  if (file) {
+    file.name = newName;
+    await DB.updateFile(file);
+  }
+  renameModal.close();
+  currentRenameFileId = null;
+  renderFileList();
+}
+
+// --- Feature: Favorites ---
+async function toggleFavorite(e, fileId) {
+  e.stopPropagation();
+  const file = await DB.getFile(fileId);
+  if (file) {
+    file.favorite = !file.favorite;
+    await DB.updateFile(file);
+    renderFileList(searchInput?.value || '');
+  }
+}
+
+// --- Logic: Direct File Download with Original Password Verification ---
+async function handleDownloadFile(e, fileId) {
+  if (e) e.stopPropagation();
+
+  try {
+    const fileRecord = await DB.getFile(fileId);
+    if (!fileRecord) {
+      await showAlert('Error', 'File not found');
+      return;
+    }
+
+    const passKeyEntry = fileRecord.keys?.find(k => k.type === 'password');
+    if (!passKeyEntry) {
+      await showAlert('Error', 'No password encryption found for this file.');
+      return;
+    }
+
+    // Prompt user for original password
+    const password = await showPrompt(
+      'Download Original File',
+      `Enter original password to download "${fileRecord.name}":`,
+      { inputType: 'password', placeholder: 'Enter original password...' }
+    );
+
+    if (!password) return; // User cancelled or left empty
+
+    // Verify password and unwrap key
+    let fileKey;
+    try {
+      const passwordKey = await SecureCrypto.deriveKeyFromPassword(password, passKeyEntry.salt);
+      fileKey = await SecureCrypto.unwrapKey(passKeyEntry.data, passwordKey, passKeyEntry.iv);
+    } catch (authErr) {
+      console.error(authErr);
+      await showAlert('Error', 'Incorrect password. Decryption failed.');
+      return;
+    }
+
+    // Decrypt content
+    const decryptedBuffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
+
+    // Create Blob and trigger download of original decrypted file
+    const blob = new Blob([decryptedBuffer], { type: fileRecord.type || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = fileRecord.name;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 500);
+
+    // Track access log
+    addAccessLog(fileRecord, 'downloaded');
+    await DB.updateFile(fileRecord);
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Failed to download file: ' + (err.message || 'Decryption error'));
+  }
+}
+
+async function handleShareFile(e, fileId) {
+  e.stopPropagation();
+
+  try {
+    const fileRecord = await DB.getFile(fileId);
+    if (!fileRecord) return;
+
+    const result = await decryptFileForExport(fileRecord);
+    if (!result || !result.buffer) return;
+    const { buffer: decryptedBuffer, password: capturedPassword } = result;
+
+    let finalPassword = capturedPassword;
+    if (!finalPassword) {
+      // If we didn't capture the password (e.g. Persistent mode used device key), we must ask for it now
+      finalPassword = await showPrompt('Share File', `Enter the file's password to protect this export:`, { inputType: 'password', placeholder: 'Enter original password...' });
+    }
+
+    if (!finalPassword) return;
+
+    // Simple share without customization
+    await exportSecureFile(fileRecord, decryptedBuffer, finalPassword, {});
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Share failed: ' + err.message);
+  }
+}
+
+// Open Share Modal
+function handleCustomShare(e, fileId) {
+  e.stopPropagation();
+  currentShareFileId = fileId;
+  document.getElementById('share-password').value = '';
+  document.getElementById('share-title').value = '';
+  document.getElementById('share-logo').value = '';
+  const shareModal = document.getElementById('share-modal');
+  shareModal?.showModal();
+}
+
+// Handle Export from Modal
+async function handleShareConfirm() {
+  const shareModal = document.getElementById('share-modal');
+  const password = document.getElementById('share-password').value;
+  const title = document.getElementById('share-title').value || 'SecureVault';
+  const logoInput = document.getElementById('share-logo');
+
+  if (!password) {
+    await showAlert('Required', 'Please set a password for the file.');
+    return;
+  }
+
+  const confirmBtn = document.getElementById('confirm-share');
+  const originalText = confirmBtn.innerText;
+  confirmBtn.innerText = 'Exporting...';
+
+  try {
+    const fileRecord = await DB.getFile(currentShareFileId);
+    if (!fileRecord) throw new Error('File not found');
+
+    const result = await decryptFileForExport(fileRecord, password);
+    if (!result || !result.buffer) throw new Error('Decryption failed');
+    const decryptedBuffer = result.buffer;
+
+    // Process Logo
+    let logoDataUrl = "";
+    if (logoInput.files && logoInput.files[0]) {
+      logoDataUrl = await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(logoInput.files[0]);
+      });
+    }
+
+    const customization = { title: title, logoUrl: logoDataUrl };
+    await exportSecureFile(fileRecord, decryptedBuffer, password, customization);
+
+    shareModal.close();
+    currentShareFileId = null;
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Export failed: ' + err.message);
+  } finally {
+    confirmBtn.innerText = originalText;
+  }
+}
+
+// Common export function
+async function exportSecureFile(fileRecord, decryptedBuffer, password, customization) {
+  const exportSalt = SecureCrypto.generateSalt();
+  const exportKey = await SecureCrypto.deriveKeyFromPassword(password, exportSalt, 600000);
+  const { iv, ciphertext } = await SecureCrypto.encryptData(exportKey, decryptedBuffer);
+
+  const blobToBase64 = (blob) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        resolve(reader.result.split(',')[1]);
+      };
+    });
+  };
+
+  const base64Data = await blobToBase64(new Blob([ciphertext]));
+  const { header, footer } = generateSecureHTMLParts(fileRecord, exportSalt, iv, customization);
+
+  const finalBlob = new Blob([header, base64Data, footer], { type: 'text/html' });
+  const url = URL.createObjectURL(finalBlob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileRecord.name + '.secure.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  await showAlert('Success', 'Exported! The file is password-protected.');
+}
+
+// Generate Header and Footer parts for the HTML wrapper to allow efficient Blob assembly
+function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
+  // Buffers to Base64
+  const toB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const saltB64 = toB64(salt);
+  const ivB64 = toB64(iv);
+
+  // Customization defaults
+  const brandTitle = customization.title || 'SecureVault';
+  const logoUrl = customization.logoUrl || '';
+
+  // Logo HTML - either custom image or default lock icon
+  const logoHTML = logoUrl
+    ? `<img src="${logoUrl}" alt="Logo" style="width:64px;height:64px;object-fit:contain;margin-bottom:16px;border-radius:12px;">`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:#0f172a;margin-bottom:16px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+
+  const header = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${brandTitle} - ${fileMeta.name}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#ffffff;color:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+        .container{background:#ffffff;padding:48px 32px;border-radius:16px;text-align:center;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -2px rgba(0,0,0,0.07);max-width:400px;width:100%;border:1px solid #e5e5e5}
+        .brand{font-size:14px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+        h2{font-size:20px;font-weight:600;margin-bottom:8px;color:#0f172a}
+        .filename{font-size:14px;color:#64748b;margin-bottom:24px;word-break:break-all}
+        #input-area{display:flex;flex-direction:column;gap:12px}
+        input{width:100%;padding:14px 16px;border-radius:8px;border:1px solid #e5e5e5;background:#fafafa;color:#0f172a;font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s,background 0.2s}
+        input:focus{border-color:#a3a3a3;background:#ffffff}
+        input::placeholder{color:#a3a3a3}
+        button{background:#0f172a;color:#ffffff;border:none;padding:14px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;width:100%;font-family:inherit;transition:background 0.2s}
+        button:hover{background:#1e293b}
+        button:active{transform:scale(0.98)}
+        #error{color:#dc2626;margin-top:12px;font-size:13px;display:none}
+        #status{color:#64748b;margin-top:12px;font-size:12px;min-height:1.2em}
+        #viewer{width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:flex-start;position:fixed;top:0;left:0;background:#ffffff;z-index:9999;padding:0;overflow-y:auto}
+        #viewer.active{display:flex}
+        video,audio,img{max-width:100%;max-height:80vh;border-radius:12px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1),0 8px 10px -6px rgba(0,0,0,0.1)}
+        .expired-msg{color:#dc2626;font-size:24px;font-weight:700;margin-bottom:12px}
+        .viewer-top-bar{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:12px;padding:12px 16px;background:#ffffff;border-bottom:1px solid #e5e5e5;box-sizing:border-box;flex-shrink:0;position:sticky;top:0;z-index:100}
+        .btn-icon{width:40px;height:40px;border-radius:8px;border:1px solid #e5e5e5;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748b;transition:all 0.2s ease;flex-shrink:0;padding:8px}
+        .btn-icon:hover{background:#f5f5f5;color:#0f172a;transform:translateY(-1px);box-shadow:0 2px 4px rgba(0,0,0,0.05)}
+        .btn-icon:active{transform:translateY(0)}
+        .btn-icon svg{width:100%;height:100%;display:block}
+        .viewer-content-area{width:100%;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;overflow:auto}
+        .badge{display:inline-block;padding:4px 12px;background:#f5f5f5;border-radius:100px;font-size:11px;font-weight:600;color:#64748b;margin-bottom:16px;text-transform:uppercase;letter-spacing:0.02em}
+        .badge.view-once{background:#fef2f2;color:#dc2626}
+        .footer{margin-top:32px;font-size:11px;color:#a3a3a3}
+
+        /* Excel View Styles in Export */
+        .excel-viewer{width:100%;height:100%;display:flex;flex-direction:column;background:#fff;border-radius:8px;border:1px solid #e5e5e5;overflow:hidden}
+        .excel-header{display:flex;gap:8px;padding:8px 16px;background:#f5f5f5;border-bottom:1px solid #e5e5e5;overflow-x:auto}
+        .excel-sheet-btn{padding:6px 12px;border-radius:4px;background:#fff;border:1px solid #e5e5e5;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap}
+        .excel-sheet-btn:hover{background:#fafafa}
+        .excel-sheet-btn.active{background:#22c55e;color:#fff;border-color:#22c55e}
+        .excel-table-wrapper{overflow:auto;flex:1;background:#fff}
+        .excel-table{border-collapse:collapse;min-width:100%;font-size:13px;font-family:monospace}
+        .excel-table th, .excel-table td{border:1px solid #e5e5e5;padding:8px 12px;white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+        .excel-table th{background:#fafafa;font-weight:600;color:#404040;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 #e5e5e5}
+        .excel-table tr:hover{background:#f0fdf4}
+
+        /* Word View Styles in Export */
+        .word-viewer{width:100%;height:100%;overflow-y:auto;background:#f3f4f6;display:flex;justify-content:center;padding:40px 20px}
+        .word-document{width:100%;max-width:816px;min-height:1056px;background:#fff;padding:60px 72px;box-shadow:0 10px 30px rgba(0,0,0,0.1);color:#000;font-family:'Calibri',sans-serif;line-height:1.5;font-size:16px}
+        .word-document h1,.word-document h2,.word-document h3{color:#2f5597;margin-top:24px;margin-bottom:8px}
+        .word-document p{margin-bottom:12px;text-align:justify}
+        .word-document img{max-width:100%;height:auto}
+    </style>
+    <script defer src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+</head>
+<body>
+    <div id="auth" class="container">
+        ${logoHTML}
+        <div class="brand">${brandTitle}</div>
+        <h2>Secure File</h2>
+        <p class="filename">${fileMeta.name}</p>
+        
+        <div id="input-area">
+            <input type="password" id="pwd" placeholder="Enter password" autofocus>
+            <button onclick="unlock()">Unlock File</button>
+        </div>
+        
+        <p id="error">Incorrect password</p>
+        <p id="status"></p>
+        <p class="footer">Protected by ${brandTitle}</p>
+    </div>
+    
+    <div id="viewer"></div>
+
+    <script>
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('keydown', e => {
+            if (e.key === 'PrintScreen' || (e.ctrlKey && e.key === 'p') || (e.ctrlKey && e.shiftKey && e.key === 's')) {
+                e.preventDefault();
+                alert('Screen capture is restricted.');
+                document.body.style.opacity = '0';
+                setTimeout(() => document.body.style.opacity = '1', 2000);
+            }
+        });
+
+        const SALT = "${saltB64}";
+        const IV = "${ivB64}";
+        const TYPE = "${fileMeta.type}";
+        const NAME = "${fileMeta.name}";
+        const ID = "${fileMeta.id}";
+        const MODE = "${fileMeta.authMode}";
+        
+        // injected permissions
+        const PERM_MEDIA = ${localStorage.getItem('sv_dl_media') === 'true'};
+        const PERM_DOC = ${localStorage.getItem('sv_dl_doc') === 'true'};
+
+        window.onload = function() {
+        };
+
+        function toUint8(b64) {
+            const bin = atob(b64);
+            const len = bin.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes;
+        }
+
+        async function unlock() {
+            let pwd = document.getElementById('pwd').value;
+            const btn = document.querySelector('#input-area button');
+            const err = document.getElementById('error');
+            const status = document.getElementById('status');
+            
+            if (!pwd) return;
+
+            try {
+                if(btn) btn.innerText = "Decrypting...";
+                err.style.display = 'none';
+                
+                const salt = toUint8(SALT);
+                const iv = toUint8(IV);
+                const encrypted = toUint8(DATA);
+                
+                const enc = new TextEncoder();
+                const keyMaterial = await window.crypto.subtle.importKey("raw", enc.encode(pwd), "PBKDF2", false, ["deriveKey"]);
+                const key = await window.crypto.subtle.deriveKey({ name: "PBKDF2", salt: salt, iterations: 600000, hash: "SHA-256" }, keyMaterial, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+                
+                const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, encrypted);
+                
+                const blob = new Blob([decrypted], { type: TYPE });
+                const url = URL.createObjectURL(blob);
+                
+                document.getElementById('auth').style.display = 'none';
+                const v = document.getElementById('viewer');
+                v.classList.add('active'); // Use class for display toggle
+                v.innerHTML = ''; // Clear previous content
+
+                // Determine Download Permission
+                const isMedia = TYPE.startsWith('image') || TYPE.startsWith('video') || TYPE.startsWith('audio');
+                const isDoc = TYPE === 'application/pdf' || TYPE.includes('word') || TYPE.includes('excel') || TYPE.includes('spreadsheet') || NAME.endsWith('.docx') || NAME.endsWith('.xlsx') || NAME.endsWith('.csv') || NAME.endsWith('.xls');
+                
+                let allowDL = false;
+                if (isMedia && PERM_MEDIA) allowDL = true;
+                if (isDoc && PERM_DOC) allowDL = true;
+
+                // Top bar with close + download
+                const topBar = document.createElement('div');
+                topBar.className = 'viewer-top-bar';
+
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+                closeBtn.className = 'btn-icon';
+                closeBtn.title = 'Close';
+                closeBtn.onclick = () => location.reload();
+                topBar.appendChild(closeBtn);
+
+                if (allowDL) {
+                    const dlBtn = document.createElement('button');
+                    dlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+                    dlBtn.className = 'btn-icon';
+                    dlBtn.title = 'Download';
+                    dlBtn.onclick = function() {
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = NAME;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(function(){ document.body.removeChild(a); }, 200);
+                    };
+                    topBar.appendChild(dlBtn);
+                }
+
+                v.appendChild(topBar);
+
+                // Content area
+                const contentArea = document.createElement('div');
+                contentArea.className = 'viewer-content-area';
+
+                if (TYPE.startsWith('video')) {
+                    const vid = document.createElement('video');
+                    vid.src = url;
+                    vid.controls = true;
+                    vid.autoplay = true;
+                    if (!allowDL) {
+                        vid.setAttribute('controlsList', 'nodownload');
+                        vid.oncontextmenu = (e) => e.preventDefault();
+                    }
+                    contentArea.appendChild(vid);
+                } else if (TYPE.startsWith('audio')) {
+                    const aud = document.createElement('audio');
+                    aud.src = url;
+                    aud.controls = true;
+                    aud.autoplay = true;
+                    if (!allowDL) {
+                        aud.setAttribute('controlsList', 'nodownload');
+                        aud.oncontextmenu = (e) => e.preventDefault();
+                    }
+                    contentArea.appendChild(aud);
+                } else if (TYPE.startsWith('image')) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    contentArea.appendChild(img);
+                } else if (TYPE === 'application/pdf' || TYPE.startsWith('text/')) {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = allowDL ? url : url + '#toolbar=0';
+                    iframe.style.cssText = "width:100%;height:100%;border:none;background:#fff;border-radius:8px;";
+                    contentArea.appendChild(iframe);
+                } else if (
+                    TYPE === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                    TYPE === 'application/vnd.ms-excel' ||
+                    NAME.endsWith('.xlsx') || 
+                    NAME.endsWith('.xls') ||
+                    NAME.endsWith('.csv')
+                ) {
+                    // Excel Logic
+                    try {
+                        const wb = XLSX.read(new Uint8Array(decrypted), {type: 'array'});
+                        const sn = wb.SheetNames;
+                        if(sn.length > 0) {
+                             const viewer = document.createElement('div');
+                             viewer.className = 'excel-viewer';
+                             const header = document.createElement('div');
+                             header.className = 'excel-header';
+                             const body = document.createElement('div');
+                             body.className = 'excel-table-wrapper';
+                             
+                             const render = (n) => {
+                                 body.innerHTML = '';
+                                 const ws = wb.Sheets[n];
+                                 const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+                                 if(!data || data.length===0){ body.innerHTML='Empty'; return; }
+                                 const tbl = document.createElement('table');
+                                 tbl.className = 'excel-table';
+                                 data.forEach((r, i) => {
+                                     const tr = document.createElement('tr');
+                                     r.forEach(c => {
+                                         const el = i===0?'th':'td';
+                                         const cell = document.createElement(el);
+                                         cell.textContent = c!==undefined?c:'';
+                                         tr.appendChild(cell);
+                                     });
+                                     tbl.appendChild(tr);
+                                 });
+                                 body.appendChild(tbl);
+                             };
+                             
+                             sn.forEach(n => {
+                                 const btn = document.createElement('button');
+                                 btn.className = 'excel-sheet-btn';
+                                 if(n===sn[0]) btn.classList.add('active');
+                                 btn.textContent = n;
+                                 btn.onclick = () => {
+                                     render(n);
+                                     header.querySelectorAll('.excel-sheet-btn').forEach(b=>b.classList.remove('active'));
+                                     btn.classList.add('active');
+                                 };
+                                 header.appendChild(btn);
+                             });
+                             
+                             render(sn[0]);
+                             viewer.appendChild(header);
+                             viewer.appendChild(body);
+                             contentArea.appendChild(viewer); 
+                        }
+                    } catch(e) { console.error(e); }
+                } else if (
+                    TYPE === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                    NAME.endsWith('.docx')
+                ) {
+                    // Word Logic
+                    try {
+                        window.mammoth.convertToHtml({arrayBuffer: decrypted})
+                            .then(result => {
+                                 const viewer = document.createElement('div');
+                                 viewer.className = 'word-viewer';
+                                 const doc = document.createElement('div');
+                                 doc.className = 'word-document';
+                                 doc.innerHTML = result.value;
+                                 viewer.appendChild(doc);
+                                 contentArea.appendChild(viewer);
+                            })
+                            .catch(err => {
+                                 const msg = document.createElement('div');
+                                 msg.innerText = "Error parsing document: " + err.message;
+                                 msg.style.color = 'red';
+                                 contentArea.appendChild(msg);
+                            });
+                    } catch(e) { console.error(e); }
+                } else {
+                    const msg = document.createElement('p');
+                    msg.innerText = "Preview not supported for this file type.";
+                    msg.style.cssText = "color:#64748b;font-weight:500;margin-top:20px;";
+                    contentArea.appendChild(msg);
+                }
+
+                v.appendChild(contentArea);
+                
+            } catch (e) {
+                console.error(e);
+                err.style.display = 'block';
+                if(btn) btn.innerText = "Unlock File";
+                if(status) status.innerText = "";
+            }
+        }
+
+        document.getElementById('pwd').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') unlock();
+        });
+        
+        const DATA = "`;
+
+  const footer = `";
+    </script>
+</body>
+</html>`;
+
+  return { header, footer };
+}
+
+
+// Helper to decrypt strictly for export (using internal storage keys)
+async function decryptFileForExport(fileRecord, providedPassword = null) {
+  // We need to unlock it first.
+  let fileKey = null;
+  let usedPassword = providedPassword;
+
+  // 1. Try provided password first if available
+  if (providedPassword) {
+    try {
+      const passKeyEntry = fileRecord.keys.find(k => k.type === 'password');
+      if (passKeyEntry) {
+        const passwordKey = await SecureCrypto.deriveKeyFromPassword(providedPassword, passKeyEntry.salt);
+        fileKey = await SecureCrypto.unwrapKey(passKeyEntry.data, passwordKey, passKeyEntry.iv);
+      }
+    } catch (e) {
+      console.log('Provided password invalid for unlock');
+      // Fall through to other methods
+    }
+  }
+
+  // 2. If still no key, we MUST ask for the original password
+  if (!fileKey) {
+    const password = await showPrompt('Decrypt for Export', 'Provide the ORIGINAL password to decrypt for export:', { inputType: 'password', placeholder: 'Enter password...' });
+    if (!password) return null;
+
+    try {
+      const passKeyEntry = fileRecord.keys.find(k => k.type === 'password');
+      const passwordKey = await SecureCrypto.deriveKeyFromPassword(password, passKeyEntry.salt);
+      fileKey = await SecureCrypto.unwrapKey(passKeyEntry.data, passwordKey, passKeyEntry.iv);
+      usedPassword = password; // Capture it
+    } catch (err) {
+      await showAlert('Error', 'Incorrect password');
+      return null;
+    }
+  }
+
+  const buffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
+  return { buffer, password: usedPassword };
+}
+
+
+
+// --- Logic: Add File ---
+
+async function handleAddFile() {
+  const file = fileInput.files[0];
+  const password = document.getElementById('new-password').value;
+
+
+  if (!file) {
+    await showAlert('Required', 'Please select a file');
+    return;
+  }
+  if (!password) {
+    await showAlert('Required', 'Password is required');
+    return;
+  }
+
+  const confirmBtn = document.getElementById('confirm-add');
+  const originalText = confirmBtn.innerText;
+  confirmBtn.innerText = 'Encrypting...';
+  confirmBtn.disabled = true;
+
+  try {
+    // 1. Generate keys
+    const fileKey = await SecureCrypto.generateKey();
+    const salt = SecureCrypto.generateSalt();
+    const passwordKey = await SecureCrypto.deriveKeyFromPassword(password, salt);
+
+    // 2. Encrypt Content
+    const fileBuffer = await file.arrayBuffer();
+    const { iv: fileIv, ciphertext } = await SecureCrypto.encryptData(fileKey, fileBuffer);
+
+    // 3. Wrap Keys
+    // Wrap with Password
+    const { iv: wrapIv, wrappedData: wrappedWithPass } = await SecureCrypto.wrapKey(fileKey, passwordKey);
+
+    const keys = [
+      { type: 'password', salt: salt, iv: wrapIv, data: wrappedWithPass }
+    ];
+
+    // 4. Create Record
+    const fileRecord = {
+      id: crypto.randomUUID(),
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      date: Date.now(),
+      authMode: 'always',
+      keys: keys,
+      content: ciphertext,
+      iv: fileIv,
+      viewCount: 0,
+
+      accessLog: [{ action: 'created', date: Date.now() }]
+    };
+
+    await DB.saveFile(fileRecord);
+
+    resetAddForm();
+    renderFileList();
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Encryption failed: ' + err.message);
+  } finally {
+    confirmBtn.innerText = originalText;
+    confirmBtn.disabled = false;
+  }
+}
+
+// --- Logic: Open File ---
+
+async function onFileClick(fileId) {
+  try {
+    const fileRecord = await DB.getFile(fileId);
+    if (!fileRecord) {
+      await showAlert('Error', 'File not found');
+      return;
+    }
+    selectedFileForAuth = fileRecord;
+    document.getElementById('auth-file-name').innerText = fileRecord.name;
+    authModal.showModal();
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Error opening file');
+  }
+}
+
+async function handleAuthSubmit() {
+  const password = document.getElementById('auth-password').value;
+  if (!selectedFileForAuth || !password) return;
+
+  const btn = document.getElementById('confirm-auth');
+  btn.innerText = 'Unlocking...';
+
+  try {
+    const fileRecord = selectedFileForAuth;
+    const passKeyEntry = fileRecord.keys.find(k => k.type === 'password');
+    if (!passKeyEntry) throw new Error('Corrupt key data');
+
+    // Derive key
+    const passwordKey = await SecureCrypto.deriveKeyFromPassword(password, passKeyEntry.salt);
+
+    // Unwrap
+    const fileKey = await SecureCrypto.unwrapKey(passKeyEntry.data, passwordKey, passKeyEntry.iv);
+
+    authModal.close();
+    document.getElementById('auth-password').value = '';
+    openViewer(fileRecord, fileKey);
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Incorrect password or error.');
+  } finally {
+    btn.innerText = 'Unlock';
+  }
+}
+
+// --- Logic: Viewer ---
+
+async function openViewer(fileRecord, fileKey) {
+  try {
+    // Decrypt
+    const decryptedBuffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
+    const blob = new Blob([decryptedBuffer], { type: fileRecord.type });
+    currentDecryptedUrl = URL.createObjectURL(blob);
+
+    // UI
+    const container = document.getElementById('viewer-content');
+    container.innerHTML = '';
+
+    // Check Permissions
+    const allowMedia = localStorage.getItem('sv_dl_media') === 'true';
+    const allowDoc = localStorage.getItem('sv_dl_doc') === 'true';
+    const isMedia = fileRecord.type.startsWith('image') || fileRecord.type.startsWith('video') || fileRecord.type.startsWith('audio');
+    const isDoc = fileRecord.type === 'application/pdf' || fileRecord.type.includes('word') || fileRecord.type.includes('excel') || fileRecord.type.includes('spreadsheet') || fileRecord.name.endsWith('.docx') || fileRecord.name.endsWith('.xlsx') || fileRecord.name.endsWith('.xls') || fileRecord.name.endsWith('.csv');
+
+    let allowDL = false;
+    if (isMedia && allowMedia) allowDL = true;
+    if (isDoc && allowDoc) allowDL = true;
+
+    // Show/Hide Header Download Button
+    if (viewerDownloadBtn) {
+      if (allowDL) {
+        viewerDownloadBtn.classList.remove('hidden');
+        viewerDownloadBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = currentDecryptedUrl;
+          a.download = fileRecord.name;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => document.body.removeChild(a), 200);
+        };
+      } else {
+        viewerDownloadBtn.classList.add('hidden');
+        viewerDownloadBtn.onclick = null;
+      }
+    }
+
+    if (fileRecord.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = currentDecryptedUrl;
+      container.appendChild(img);
+    } else if (fileRecord.type.startsWith('video/') || fileRecord.type.startsWith('audio/')) {
+      const media = document.createElement(fileRecord.type.startsWith('video/') ? 'video' : 'audio');
+      media.src = currentDecryptedUrl;
+      media.controls = true;
+      media.autoplay = true;
+      // Anti-download if not allowed
+      if (!allowDL) {
+        media.setAttribute('controlsList', 'nodownload');
+        media.oncontextmenu = (e) => e.preventDefault();
+      }
+      container.appendChild(media);
+    } else if (fileRecord.type === 'application/pdf') {
+      const iframe = document.createElement('iframe');
+      iframe.src = currentDecryptedUrl + (allowDL ? '' : '#toolbar=0');
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      container.appendChild(iframe);
+    } else if (
+      fileRecord.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      fileRecord.type === 'application/vnd.ms-excel' ||
+      fileRecord.name.endsWith('.xlsx') ||
+      fileRecord.name.endsWith('.xls') ||
+      fileRecord.name.endsWith('.csv')
+    ) {
+      renderExcelToHTML(decryptedBuffer, container);
+    } else if (
+      fileRecord.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      fileRecord.name.endsWith('.docx')
+    ) {
+      await renderWordToHTML(decryptedBuffer, container);
+    } else {
+      container.innerText = "Preview not supported for this file type.";
+    }
+
+    document.getElementById('viewer-filename').innerText = fileRecord.name;
+    viewer.classList.remove('hidden');
+
+    // Track recently viewed
+    addToRecentlyViewed(fileRecord);
+
+    document.getElementById('viewer-timer').classList.add('hidden');
+
+  } catch (err) {
+    console.error(err);
+    await showAlert('Error', 'Decryption failed.');
+  }
+}
+
+async function closeViewer() {
+  viewer.classList.add('hidden');
+  if (viewerDownloadBtn) viewerDownloadBtn.classList.add('hidden');
+  document.getElementById('viewer-content').innerHTML = '';
+
+  if (currentDecryptedUrl) {
+    URL.revokeObjectURL(currentDecryptedUrl);
+    currentDecryptedUrl = null;
+  }
+}
+
+// --- Logic: Security ---
+
+async function checkCrashRecovery() {
+  // Crash recovery (legacy cleanup)
+  const crashId = localStorage.getItem('sv_crash_guard');
+  if (crashId) {
+    localStorage.removeItem('sv_crash_guard');
+    renderFileList();
+  }
+}
+
+// Privacy Curtain functions removed as feature was requested to be deleted.
+
+
+// --- Rendering ---
+
+async function renderFileList(searchQuery = '') {
+  fileList.innerHTML = '';
+  let files = await DB.getAllFiles();
+  allFiles = files; // Cache for other functions
+
+  // Update storage usage
+  updateStorageUsage(files);
+
+  // Filter by search
+  if (searchQuery) {
+    files = files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }
+
+  // Sort
+  const sortValue = sortSelect?.value || 'date-desc';
+  files.sort((a, b) => {
+    // Favorites first
+    if (a.favorite && !b.favorite) return -1;
+    if (!a.favorite && b.favorite) return 1;
+
+    switch (sortValue) {
+      case 'date-desc': return (b.date || 0) - (a.date || 0);
+      case 'date-asc': return (a.date || 0) - (b.date || 0);
+      case 'name-asc': return a.name.localeCompare(b.name);
+      case 'name-desc': return b.name.localeCompare(a.name);
+      case 'size-desc': return (b.size || 0) - (a.size || 0);
+      case 'size-asc': return (a.size || 0) - (b.size || 0);
+      default: return 0;
+    }
+  });
+
+  // Show/hide quick tips based on file count
+  const quickTips = document.getElementById('quick-tips');
+  if (quickTips) {
+    if (allFiles.length === 0) {
+      quickTips.classList.remove('hidden');
+    } else {
+      quickTips.classList.add('hidden');
+    }
+  }
+
+  if (files.length === 0) {
+    fileList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔐</div>
+        <p>${searchQuery ? 'No files match your search.' : 'No secured files yet.'}</p>
+        <small>${searchQuery ? 'Try a different search term.' : 'Tap + to secure your first file'}</small>
+      </div>`;
+    return;
+  }
+
+  files.forEach((file, index) => {
+    const el = document.createElement('div');
+    el.className = 'file-card';
+    el.style.animationDelay = `${index * 0.05}s`;
+
+    // Click handler
+    el.onclick = async (e) => {
+      if (!e.target.closest('.file-actions') && !e.target.closest('.select-checkbox') && !e.target.closest('.favorite-btn')) {
+        onFileClick(file.id);
+      }
+    };
+
+    let icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>';
+    if (file.type?.startsWith('image')) icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+    if (file.type?.startsWith('video')) icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>';
+    if (file.type?.startsWith('audio')) icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
+
+    let badges = '';
+
+
+    const isSelected = selectedFiles.has(file.id);
+    const isFavorite = file.favorite;
+
+    let displayName = file.name;
+    // Feature "Show Extensions" removed, displaying full name by default.
+    // if (!showExtensions && displayName.includes('.')) {
+    //   displayName = displayName.substring(0, displayName.lastIndexOf('.'));
+    // }
+
+    const downloadSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
+    const shareSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
+    const customSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+
+    el.innerHTML = `
+        <div class="file-card-top">
+          <input type="checkbox" class="select-checkbox" ${isSelected ? 'checked' : ''} />
+          <div class="file-icon">${icon}</div>
+          <div class="file-details">
+            <h3>${displayName}</h3>
+            <div class="file-meta">
+              <span>${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+              ${badges}
+            </div>
+          </div>
+        </div>
+        <div class="file-card-actions">
+          <button class="btn-highlight download-btn">${downloadSvg} Download</button>
+          <button class="btn-highlight share-btn">${shareSvg} Share</button>
+          <button class="btn-highlight custom-share-btn">${customSvg} Custom</button>
+          <button class="btn-small info-btn">ℹ Info</button>
+          <button class="btn-small rename-btn">✏ Rename</button>
+          <button class="btn-small delete-btn">🗑 Delete</button>
+        </div>
+    `;
+
+    // Event listeners
+    el.querySelector('.select-checkbox').onchange = (e) => {
+      e.stopPropagation();
+      if (e.target.checked) {
+        selectedFiles.add(file.id);
+      } else {
+        selectedFiles.delete(file.id);
+      }
+      updateBulkUI();
+    };
+
+    el.querySelector('.download-btn').onclick = (e) => handleDownloadFile(e, file.id);
+    el.querySelector('.info-btn').onclick = (e) => showFileInfo(e, file.id);
+    el.querySelector('.rename-btn').onclick = (e) => openRenameModal(e, file.id, file.name);
+    el.querySelector('.share-btn').onclick = (e) => handleShareFile(e, file.id);
+    el.querySelector('.custom-share-btn').onclick = (e) => handleCustomShare(e, file.id);
+    el.querySelector('.delete-btn').onclick = (e) => handleDeleteFile(e, file.id);
+
+    fileList.appendChild(el);
+  });
+}
+
+// --- Settings Features ---
+
+function loadSettings() {
+  // Privacy & Extension Toggles Removed
+  // New Features Removed
+
+  // Remove lock button visibility
+  const removeBtn = document.getElementById('remove-app-lock');
+  if (removeBtn) removeBtn.style.display = appLockPassword ? 'block' : 'none';
+
+  // Load Panic Setting
+  const savedAction = localStorage.getItem('sv_panic_action') || 'lock';
+  const panicSelect = document.getElementById('panic-action-select');
+  if (panicSelect) panicSelect.value = savedAction;
+
+  // Load Download Permissions
+  const allowMedia = localStorage.getItem('sv_dl_media') === 'true';
+  const allowDoc = localStorage.getItem('sv_dl_doc') === 'true';
+  const mediaToggle = document.getElementById('dl-media-toggle');
+  const docToggle = document.getElementById('dl-doc-toggle');
+  if (mediaToggle) mediaToggle.checked = allowMedia;
+  if (docToggle) docToggle.checked = allowDoc;
+
+  // Load Panic Enabled Toggle
+  const panicEnabled = localStorage.getItem('sv_panic_enabled') === 'true'; // Default false
+  const panicToggle = document.getElementById('panic-enable-toggle');
+  if (panicToggle) panicToggle.checked = panicEnabled;
+  updatePanicVisibility();
+
+  // Load Recovery Status
+  const recoveryQ = localStorage.getItem('sv_recovery_q');
+  const recoveryStatus = document.getElementById('recovery-status');
+  const recoveryQInput = document.getElementById('recovery-question');
+  if (recoveryStatus) {
+    if (recoveryQ) {
+      recoveryStatus.style.display = 'block';
+      recoveryStatus.innerText = '✅ Recovery method set (Question: ' + recoveryQ + ')';
+      if (recoveryQInput) recoveryQInput.value = recoveryQ;
+    } else {
+      recoveryStatus.style.display = 'none';
+      if (recoveryQInput) recoveryQInput.value = '';
+    }
+  }
+}
+
+async function handleSetAppLock() {
+  const pass = document.getElementById('app-lock-password').value;
+  if (!pass) {
+    await showAlert('Required', 'Please enter a password');
+    return;
+  }
+
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+  const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  localStorage.setItem('sv_app_lock', hashHex);
+  appLockPassword = hashHex;
+  await showAlert('Success', 'App Lock Password Set!');
+  document.getElementById('app-lock-password').value = '';
+  loadSettings();
+}
+
+async function handleRemoveAppLock() {
+  const confirmed = await showConfirm('Remove App Lock', 'Remove App Lock password?');
+  if (confirmed) {
+    localStorage.removeItem('sv_app_lock');
+    appLockPassword = null;
+    await showAlert('Success', 'App Lock removed.');
+    loadSettings();
+  }
+}
+
+async function handleSetRecovery() {
+  const question = document.getElementById('recovery-question').value.trim();
+  const answer = document.getElementById('recovery-answer').value.trim().toLowerCase();
+
+  if (!question || !answer) {
+    await showAlert('Required', 'Please enter both a question and an answer.');
+    return;
+  }
+
+  // Hash the answer
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(answer));
+  const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  localStorage.setItem('sv_recovery_q', question);
+  localStorage.setItem('sv_recovery_a', hashHex);
+
+  await showAlert('Success', 'Recovery method saved!');
+  document.getElementById('recovery-answer').value = '';
+  loadSettings();
+}
+
+async function handleForgotPassword() {
+  const recoveryQ = localStorage.getItem('sv_recovery_q');
+  const recoveryA = localStorage.getItem('sv_recovery_a');
+
+  if (!recoveryQ || !recoveryA) {
+    await showAlert('No Recovery', 'No recovery method has been set. The app lock cannot be reset.');
+    return;
+  }
+
+  const answer = await showPrompt('Password Recovery', `Security Question:\n${recoveryQ}`, {
+    placeholder: 'Enter your answer...'
+  });
+
+  if (!answer) return;
+
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(answer.trim().toLowerCase()));
+  const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  if (hashHex === recoveryA) {
+    await showAlert('Success', ' Identity verified. App Lock has been removed.');
+    localStorage.removeItem('sv_app_lock');
+    appLockPassword = null;
+    location.reload();
+  } else {
+    await showAlert('Error', 'Incorrect answer.');
+  }
+}
+
+async function checkAppLock() {
+  if (!appLockPassword) return;
+
+  const overlay = document.getElementById('app-lock-screen');
+  const input = document.getElementById('lock-input');
+  const btn = document.getElementById('unlock-submit');
+
+  overlay.classList.remove('hidden');
+
+  const attemptUnlock = async () => {
+    const pass = input.value;
+    if (!pass) return;
+
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+    const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    if (hashHex === appLockPassword) {
+      overlay.classList.add('hidden');
+      input.value = '';
+    } else {
+      await showAlert('Error', 'Incorrect Password');
+      input.value = '';
+      input.focus();
+    }
+  };
+
+  btn.onclick = attemptUnlock;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') attemptUnlock();
+  };
+}
+
+// --- Panic Button Feature ---
+function updatePanicVisibility() {
+  const isEnabled = localStorage.getItem('sv_panic_enabled') === 'true';
+  const headerBtn = document.getElementById('header-panic-wrapper');
+  const settingsContent = document.getElementById('panic-settings-content');
+
+  // Show/Hide Header Button
+  if (headerBtn) {
+    if (isEnabled) {
+      headerBtn.classList.remove('hidden');
+      headerBtn.style.display = 'flex'; // Ensure flex display if using classList doesn't fully override
+    } else {
+      headerBtn.classList.add('hidden');
+      headerBtn.style.display = 'none';
+    }
+  }
+
+  // Show/Hide Settings Content
+  if (settingsContent) {
+    if (isEnabled) {
+      settingsContent.classList.remove('hidden');
+      settingsContent.style.opacity = '1';
+      settingsContent.style.pointerEvents = 'auto';
+    } else {
+      settingsContent.classList.add('hidden');
+      settingsContent.style.opacity = '0.5';
+      settingsContent.style.pointerEvents = 'none';
+    }
+  }
+}
+
+function triggerPanic() {
+  const action = localStorage.getItem('sv_panic_action') || 'lock'; // Default is now lock
+
+  if (action === 'none') {
+    return;
+  } else if (action === 'erase') {
+    // Immediate wipe without confirmation - but preserve panic setting
+    (async () => {
+      try {
+        const panicSetting = localStorage.getItem('sv_panic_action'); // Preserve
+        const files = await DB.getAllFiles();
+        for (const file of files) await DB.deleteFile(file.id);
+        localStorage.clear();
+        if (panicSetting) localStorage.setItem('sv_panic_action', panicSetting); // Restore
+        location.reload();
+      } catch (e) { console.error(e); }
+    })();
+  } else if (action === 'lock') {
+    // Check if app lock is set
+    if (!appLockPassword) {
+      showAlert('App Lock Not Set', 'Please set an App Lock password in Settings first to use this feature.');
+      return;
+    }
+    // Reload triggers app lock on init if set
+    window.location.reload();
+  } else if (action === 'blur') {
+    const overlay = document.createElement('div');
+    overlay.className = 'panic-overlay blur-mode';
+    overlay.innerHTML = `
+           <div class="panic-message">System Error (0xCRITICAL)</div>
+           <div class="panic-message" style="font-size:16px;font-weight:400;margin-bottom:24px;">Please reload the application.</div>
+           <div class="reload-icon-btn" id="panic-reload-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                 <polyline points="23 4 23 10 17 10"></polyline>
+                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+           </div>
+           <div class="pull-to-reload">↓ Pull down or tap icon to reload</div> 
+      `;
+    document.body.appendChild(overlay);
+
+    // Click icon to reload
+    document.getElementById('panic-reload-btn')?.addEventListener('click', () => {
+      window.location.reload();
+    });
+  } else if (action === 'loading') {
+    const overlay = document.createElement('div');
+    overlay.className = 'panic-overlay';
+    overlay.innerHTML = `<div class="fake-loading-spinner"></div><div style="color:var(--gray-500)">Loading resources...</div>
+      <div style="margin-top:20px; font-size:12px; opacity:0.5">(Touch to enter)</div>`;
+    document.body.appendChild(overlay);
+
+    const remove = () => overlay.remove();
+    overlay.addEventListener('click', remove);
+    overlay.addEventListener('touchstart', remove);
+  }
+}

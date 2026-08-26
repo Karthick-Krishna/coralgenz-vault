@@ -1,0 +1,17 @@
+{
+    "manifest_version": 3,
+    "name": "SecureVault",
+    "version": "1.0.0",
+    "description": "SecureVault - Secure File Protection. Encrypt and manage your files locally.",
+    "action": {
+        "default_popup": "index.html",
+        "default_title": "SecureVault"
+    },
+    "permissions": [
+        "storage",
+        "unlimitedStorage"
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
+    }
+}
