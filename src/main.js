@@ -1372,6 +1372,8 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
   const saltB64 = toB64(salt);
   const ivB64 = toB64(iv);
 
+  const escapeHTML = (str) => (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
   // Customization defaults
   const brandTitle = customization.title || 'SecureVault';
   const logoUrl = customization.logoUrl || '';
@@ -1386,7 +1388,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${brandTitle} - ${fileMeta.name}</title>
+    <title>${escapeHTML(brandTitle)} - ${escapeHTML(fileMeta.name)}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1444,9 +1446,9 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
 <body>
     <div id="auth" class="container">
         ${logoHTML}
-        <div class="brand">${brandTitle}</div>
+        <div class="brand">${escapeHTML(brandTitle)}</div>
         <h2>Secure File</h2>
-        <p class="filename">${fileMeta.name}</p>
+        <p class="filename">${escapeHTML(fileMeta.name)}</p>
         
         <div id="input-area">
             <input type="password" id="pwd" placeholder="Enter password" autofocus>
@@ -1455,7 +1457,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
         
         <p id="error">Incorrect password</p>
         <p id="status"></p>
-        <p class="footer">Protected by ${brandTitle}</p>
+        <p class="footer">Protected by ${escapeHTML(brandTitle)}</p>
     </div>
     
     <div id="viewer"></div>
@@ -1473,10 +1475,10 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
 
         const SALT = "${saltB64}";
         const IV = "${ivB64}";
-        const TYPE = "${fileMeta.type}";
-        const NAME = "${fileMeta.name}";
-        const ID = "${fileMeta.id}";
-        const MODE = "${fileMeta.authMode}";
+        const TYPE = ${JSON.stringify(fileMeta.type || '')};
+        const NAME = ${JSON.stringify(fileMeta.name || '')};
+        const ID = ${JSON.stringify(fileMeta.id || '')};
+        const MODE = ${JSON.stringify(fileMeta.authMode || '')};
         
         // injected permissions
         const PERM_MEDIA = ${localStorage.getItem('sv_dl_media') === 'true'};
@@ -1504,6 +1506,9 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
             try {
                 if(btn) btn.innerText = "Decrypting...";
                 err.style.display = 'none';
+                
+                // Allow browser UI to update button label before heavy decryption operations
+                await new Promise(r => setTimeout(r, 20));
                 
                 const salt = toUint8(SALT);
                 const iv = toUint8(IV);
@@ -1589,9 +1594,14 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     const img = document.createElement('img');
                     img.src = url;
                     contentArea.appendChild(img);
-                } else if (TYPE === 'application/pdf' || TYPE.startsWith('text/')) {
+                } else if (TYPE === 'application/pdf') {
                     const iframe = document.createElement('iframe');
                     iframe.src = allowDL ? url : url + '#toolbar=0';
+                    iframe.style.cssText = "width:100%;height:100%;border:none;background:#fff;border-radius:8px;";
+                    contentArea.appendChild(iframe);
+                } else if (TYPE.startsWith('text/') || TYPE === 'text/html' || NAME.endsWith('.html') || NAME.endsWith('.htm') || NAME.endsWith('.txt')) {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = url;
                     iframe.style.cssText = "width:100%;height:100%;border:none;background:#fff;border-radius:8px;";
                     contentArea.appendChild(iframe);
                 } else if (
@@ -1929,6 +1939,19 @@ async function openViewer(fileRecord, fileKey) {
       iframe.src = currentDecryptedUrl + (allowDL ? '' : '#toolbar=0');
       iframe.style.width = '100%';
       iframe.style.height = '100%';
+      container.appendChild(iframe);
+    } else if (
+      fileRecord.type.startsWith('text/') ||
+      fileRecord.type === 'text/html' ||
+      fileRecord.name.endsWith('.html') ||
+      fileRecord.name.endsWith('.htm') ||
+      fileRecord.name.endsWith('.txt')
+    ) {
+      const iframe = document.createElement('iframe');
+      iframe.src = currentDecryptedUrl;
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
       container.appendChild(iframe);
     } else if (
       fileRecord.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
