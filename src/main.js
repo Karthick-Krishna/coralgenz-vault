@@ -1518,15 +1518,19 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     const dlBtn = document.createElement('button');
                     dlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
                     dlBtn.className = 'btn-icon';
-                    dlBtn.title = 'Download';
+                    dlBtn.title = 'Download Protected File';
                     dlBtn.onclick = function() {
+                        const pageHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
                         const a = document.createElement('a');
                         a.style.display = 'none';
-                        a.href = url;
-                        a.download = NAME;
+                        const blob = new Blob([pageHtml], { type: 'text/html' });
+                        const u = URL.createObjectURL(blob);
+                        a.href = u;
+                        const outName = NAME.endsWith('.secure.html') ? NAME : (NAME + '.secure.html');
+                        a.download = outName;
                         document.body.appendChild(a);
                         a.click();
-                        setTimeout(function(){ document.body.removeChild(a); }, 200);
+                        setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(u); }, 200);
                     };
                     topBar.appendChild(dlBtn);
                 }
@@ -2012,7 +2016,7 @@ async function renderFileList(searchQuery = '') {
 
     // Click handler
     el.onclick = async (e) => {
-      if (!e.target.closest('.file-actions') && !e.target.closest('.select-checkbox') && !e.target.closest('.favorite-btn')) {
+      if (!e.target.closest('.file-card-actions') && !e.target.closest('.file-actions') && !e.target.closest('.select-checkbox') && !e.target.closest('.favorite-btn')) {
         onFileClick(file.id);
       }
     };
