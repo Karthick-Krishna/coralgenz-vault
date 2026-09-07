@@ -1179,7 +1179,7 @@ async function toggleFavorite(e, fileId) {
   }
 }
 
-// --- Logic: Direct File Download with Original Password Verification ---
+// --- Logic: File Download as Encrypted Protected File ---
 async function handleDownloadFile(e, fileId) {
   if (e) e.stopPropagation();
 
@@ -1190,50 +1190,22 @@ async function handleDownloadFile(e, fileId) {
       return;
     }
 
-    const passKeyEntry = fileRecord.keys?.find(k => k.type === 'password');
-    if (!passKeyEntry) {
-      await showAlert('Error', 'No password encryption found for this file.');
-      return;
+    const result = await decryptFileForExport(fileRecord);
+    if (!result || !result.buffer) return;
+    const { buffer: decryptedBuffer, password: capturedPassword } = result;
+
+    let finalPassword = capturedPassword;
+    if (!finalPassword) {
+      finalPassword = await showPrompt(
+        'Download Protected File',
+        `Enter the file's password to protect this download:`,
+        { inputType: 'password', placeholder: 'Enter original password...' }
+      );
     }
 
-    // Prompt user for original password
-    const password = await showPrompt(
-      'Download Original File',
-      `Enter original password to download "${fileRecord.name}":`,
-      { inputType: 'password', placeholder: 'Enter original password...' }
-    );
+    if (!finalPassword) return;
 
-    if (!password) return; // User cancelled or left empty
-
-    // Verify password and unwrap key
-    let fileKey;
-    try {
-      const passwordKey = await SecureCrypto.deriveKeyFromPassword(password, passKeyEntry.salt);
-      fileKey = await SecureCrypto.unwrapKey(passKeyEntry.data, passwordKey, passKeyEntry.iv);
-    } catch (authErr) {
-      console.error(authErr);
-      await showAlert('Error', 'Incorrect password. Decryption failed.');
-      return;
-    }
-
-    // Decrypt content
-    const decryptedBuffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
-
-    // Create Blob and trigger download of original decrypted file
-    const blob = new Blob([decryptedBuffer], { type: fileRecord.type || 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = fileRecord.name;
-    document.body.appendChild(a);
-    a.click();
-
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 500);
+    await exportSecureFile(fileRecord, decryptedBuffer, finalPassword, {}, 'Downloaded! The protected file has been saved.');
 
     // Track access log
     addAccessLog(fileRecord, 'downloaded');
@@ -1333,7 +1305,7 @@ async function handleShareConfirm() {
 }
 
 // Common export function
-async function exportSecureFile(fileRecord, decryptedBuffer, password, customization) {
+async function exportSecureFile(fileRecord, decryptedBuffer, password, customization = {}, successMessage = 'Protected file downloaded successfully!') {
   const exportSalt = SecureCrypto.generateSalt();
   const exportKey = await SecureCrypto.deriveKeyFromPassword(password, exportSalt, 600000);
   const { iv, ciphertext } = await SecureCrypto.encryptData(exportKey, decryptedBuffer);
@@ -1362,7 +1334,7 @@ async function exportSecureFile(fileRecord, decryptedBuffer, password, customiza
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  await showAlert('Success', 'Exported! The file is password-protected.');
+  await showAlert('Success', successMessage);
 }
 
 // Generate Header and Footer parts for the HTML wrapper to allow efficient Blob assembly
@@ -1895,13 +1867,7 @@ async function openViewer(fileRecord, fileKey) {
       if (allowDL) {
         viewerDownloadBtn.classList.remove('hidden');
         viewerDownloadBtn.onclick = () => {
-          const a = document.createElement('a');
-          a.style.display = 'none';
-          a.href = currentDecryptedUrl;
-          a.download = fileRecord.name;
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => document.body.removeChild(a), 200);
+          handleDownloadFile(null, fileRecord.id);
         };
       } else {
         viewerDownloadBtn.classList.add('hidden');
