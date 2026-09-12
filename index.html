@@ -4,415 +4,777 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#f4f6f9" />
-  <meta name="description" content="SecureVault — AES-256 encrypted file protection, right in your browser." />
-  <title>SecureVault</title>
+  <meta name="theme-color" content="#05070A" />
+  <meta name="description" content="Coralgenz Vault — Enterprise-Grade High-Security Cryptographic File Protection System with Zero-Knowledge AES-256 Encryption." />
+  <title>Coralgenz Vault — Secure File Protection System</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <script type="module" src="/src/main.js"></script>
 </head>
 
-<body>
+<body class="cyber-fortress-theme">
+  <!-- Matrix / Cyber Telemetry Ambient Canvas Background -->
+  <canvas id="cyber-matrix-canvas" class="cyber-matrix-canvas"></canvas>
+  <div class="cyber-grid-overlay"></div>
   <div id="app">
-    <!-- App Header -->
-    <header class="header">
+    <!-- Top Security Command Bar -->
+    <header class="header cyber-header">
       <div class="logo">
-        <div class="logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="logo-svg">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" class="lock-shackle"></path>
+        <div class="logo-icon cyber-logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-svg">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" class="shield-outline"></path>
+            <rect x="9" y="11" width="6" height="5" rx="1" ry="1" class="shield-lock-body"></rect>
+            <path d="M10 11V9.5a2 2 0 0 1 4 0V11" class="shield-shackle"></path>
           </svg>
-          <div class="logo-pulse"></div>
+          <div class="logo-pulse cyber-pulse"></div>
         </div>
         <div class="logo-text">
-          <h1>SecureVault</h1>
-          <span class="logo-tagline">by coralgenz</span>
+          <div class="brand-line">
+            <span class="brand-coral">CORALGENZ</span>
+            <span class="brand-vault">VAULT</span>
+          </div>
+          <span class="logo-tagline cyber-tagline">SECURE FILE PROTECTION SYSTEM</span>
         </div>
       </div>
-      <div class="header-actions">
 
+      <!-- Live Telemetry Status & Header Actions -->
+      <div class="header-right-group">
+        <div class="system-telemetry-badge" id="system-telemetry">
+          <span class="telemetry-beacon"></span>
+          <span class="telemetry-text">SYSTEM SECURE</span>
+          <span class="telemetry-divider">|</span>
+          <span class="telemetry-cipher">AES-256-GCM</span>
+          <span class="cyber-pill-tag">ACTIVE</span>
+        </div>
 
-        <div id="header-panic-wrapper" class="header-btn-wrapper">
-          <button id="panic-btn" class="btn-icon panic-trigger" title="Panic Mode">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-          </button>
-          <span class="btn-label" style="color:var(--red-500); font-weight:700;">PANIC</span>
-        </div>
-        <div class="header-btn-wrapper">
-          <button id="help-btn" class="btn-icon" title="Help & Guide">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-          </button>
-          <span class="btn-label">help</span>
-        </div>
-        <div class="header-btn-wrapper">
-          <button id="settings-btn" class="btn-icon" title="Settings">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" class="settings-icon">
-              <circle cx="12" cy="12" r="3" />
-              <path
-                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-          <span class="btn-label">settings</span>
+        <div class="header-actions">
+          <!-- Panic Mode Wrapper -->
+          <div id="header-panic-wrapper" class="header-btn-wrapper">
+            <button id="panic-btn" class="btn-icon cyber-btn-panic panic-trigger" title="Emergency Panic Trigger">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <span class="panic-label">PANIC</span>
+            </button>
+          </div>
+
+          <!-- Guide / Help Button -->
+          <div class="header-btn-wrapper">
+            <button id="help-btn" class="btn-icon cyber-btn-icon" title="Security Documentation & Operations Guide">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </button>
+            <span class="btn-label">GUIDE</span>
+          </div>
+
+          <!-- Settings Button -->
+          <div class="header-btn-wrapper">
+            <button id="settings-btn" class="btn-icon cyber-btn-icon" title="Cryptographic & Security Settings">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" class="settings-icon">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            <span class="btn-label">CONFIG</span>
+          </div>
         </div>
       </div>
     </header>
 
-    <!-- Two-column desktop layout -->
+    <!-- Global Application Body -->
     <div class="app-body">
 
       <!-- ============ LEFT SIDEBAR ============ -->
-      <aside class="app-sidebar">
-
-        <!-- Storage Bar -->
-        <div>
-          <p class="sidebar-section-title">Storage</p>
-          <div class="storage-bar">
-            <span id="storage-text">0 files · 0 MB used</span>
-            <div class="storage-progress">
-              <div id="storage-fill" class="storage-fill"></div>
-            </div>
+      <aside class="app-sidebar cyber-sidebar">
+        <!-- Sidebar Brand Unit -->
+        <div class="sidebar-brand-unit">
+          <div class="sidebar-vault-badge">
+            <span class="shield-code">VAULT-CORE</span>
+            <span class="version-tag">v2.6</span>
           </div>
-
         </div>
 
-        <!-- Stats -->
-        <div>
-          <p class="sidebar-section-title">Statistics</p>
-          <div class="security-banner" style="margin-bottom: var(--s3);">
-            <div class="security-status">
-              <div class="security-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                  <polyline points="9 12 11 14 15 10"></polyline>
-                </svg>
-              </div>
-              <span>AES-256 Active</span>
+        <!-- Navigation Console -->
+        <nav class="sidebar-nav">
+          <div class="sidebar-section-title">COMMAND CONSOLE</div>
+          <ul class="cyber-nav-list">
+            <li class="cyber-nav-item active" id="nav-item-console">
+              <a href="#hero-command" class="cyber-nav-link">
+                <span class="nav-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </span>
+                <span class="nav-text">Security Console</span>
+              </a>
+            </li>
+            <li class="cyber-nav-item" id="nav-item-protect">
+              <a href="#inline-add-container" class="cyber-nav-link">
+                <span class="nav-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </span>
+                <span class="nav-text">Protect File</span>
+              </a>
+            </li>
+            <li class="cyber-nav-item" id="nav-item-files">
+              <a href="#secured-files-heading" class="cyber-nav-link">
+                <span class="nav-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                </span>
+                <span class="nav-text">Protected Files</span>
+              </a>
+            </li>
+            <li class="cyber-nav-item" id="nav-item-settings">
+              <button type="button" id="sidebar-settings-btn" class="cyber-nav-link cyber-nav-btn">
+                <span class="nav-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </span>
+                <span class="nav-text">Security Settings</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+
+        <!-- Storage & Statistics Unit -->
+        <div class="sidebar-metrics-card">
+          <div class="sidebar-section-title">VAULT TELEMETRY</div>
+          
+          <div class="storage-bar cyber-storage-bar">
+            <div class="storage-header-line">
+              <span class="storage-label">LOCAL ALLOCATION</span>
+              <span id="storage-text" class="storage-metrics">0 files · 0.00 MB used</span>
             </div>
-            <div class="security-badge">Secure</div>
+            <div class="storage-progress cyber-progress-shell">
+              <div id="storage-fill" class="storage-fill cyber-progress-glow"></div>
+            </div>
           </div>
-          <div id="stats-dashboard" class="stats-dashboard">
-            <div class="stat-card">
-              <div class="stat-icon">📁</div>
+
+          <!-- Technical Metrics Grid -->
+          <div id="stats-dashboard" class="stats-dashboard cyber-stats-grid">
+            <div class="stat-card cyber-stat-card">
+              <div class="stat-label">FILES</div>
               <div class="stat-value" id="stat-total">0</div>
-              <div class="stat-label">Files</div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon">🖼️</div>
+            <div class="stat-card cyber-stat-card">
+              <div class="stat-label">IMAGES</div>
               <div class="stat-value" id="stat-images">0</div>
-              <div class="stat-label">Images</div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon">🎬</div>
+            <div class="stat-card cyber-stat-card">
+              <div class="stat-label">VIDEOS</div>
               <div class="stat-value" id="stat-videos">0</div>
-              <div class="stat-label">Videos</div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon">💾</div>
+            <div class="stat-card cyber-stat-card">
+              <div class="stat-label">STORAGE</div>
               <div class="stat-value" id="stat-size">0</div>
-              <div class="stat-label">MB Used</div>
             </div>
           </div>
         </div>
 
-        <!-- Quick Tips -->
-        <div id="quick-tips" class="quick-tips hidden">
-          <h4>🚀 Quick Start</h4>
-          <div class="tips-grid">
-            <div class="tip-card">
-              <div class="tip-icon">➕</div><span>Drop files to protect</span>
+        <!-- System Status Box -->
+        <div class="sidebar-system-status-box">
+          <div class="status-box-header">
+            <span class="status-box-title">SYSTEM STATUS</span>
+            <span class="status-pulse-pill"><span class="pulse-dot"></span> SECURE</span>
+          </div>
+          <div class="status-box-body">
+            <div class="status-line">
+              <span class="status-key">Encryption:</span>
+              <span class="status-val cyber-cyan">AES-256-GCM</span>
             </div>
-            <div class="tip-card">
-              <div class="tip-icon">🔐</div><span>Files are encrypted</span>
+            <div class="status-line">
+              <span class="status-key">Engine:</span>
+              <span class="status-val cyber-green">ACTIVE</span>
             </div>
-            <div class="tip-card">
-              <div class="tip-icon">📤</div><span>Share securely</span>
+            <div class="status-line">
+              <span class="status-key">Environment:</span>
+              <span class="status-val">LOCAL / SECURE</span>
             </div>
-            <div class="tip-card">
-              <div class="tip-icon">⏱️</div><span>Set auto-delete</span>
+            <div class="status-line">
+              <span class="status-key">Zero-Trust:</span>
+              <span class="status-val cyber-green">VERIFIED</span>
             </div>
           </div>
         </div>
 
-        <!-- Recently Viewed -->
-        <div id="recent-section" class="recent-section hidden">
-          <h4>📂 Recently Viewed</h4>
-          <div id="recent-scroll" class="recent-scroll"></div>
-        </div>
-
+        <!-- Hidden compat stubs -->
+        <div id="quick-tips" style="display:none !important;"></div>
+        <div id="recent-section" style="display:none !important;"><div id="recent-scroll"></div></div>
       </aside>
 
       <!-- ============ MAIN CONTENT AREA ============ -->
-      <div class="app-main">
+      <main class="app-main">
 
-        <!-- Toolbar -->
-        <div class="toolbar">
-          <div class="search-box">
-            <svg class="search-icon-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" id="search-input" placeholder="Search secured files..." class="search-input" />
+        <!-- Hero / Command Center Banner -->
+        <section id="hero-command" class="hero-command-center">
+          <div class="hero-header-line">
+            <div class="hero-title-group">
+              <div class="cyber-kicker"><span class="kicker-tag">DEFENSE PROTOCOL // LEVEL 4</span> ZERO-KNOWLEDGE CRYPTOGRAPHIC CONTAINER</div>
+              <h1 class="hero-title">SECURE FILE PROTECTION</h1>
+              <p class="hero-subtitle">Encrypt and protect your files inside a secure client-side cryptographic environment.</p>
+            </div>
+            <div class="hero-badge-pill">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>MIL-SPEC ENCRYPTION</span>
+            </div>
           </div>
-          <select id="sort-select" class="sort-select">
-            <option value="date-desc">Newest First</option>
-            <option value="date-asc">Oldest First</option>
-            <option value="name-asc">Name A–Z</option>
-            <option value="name-desc">Name Z–A</option>
-            <option value="size-desc">Largest First</option>
-            <option value="size-asc">Smallest First</option>
-          </select>
-        </div>
 
-        <!-- Upload Dropzone (visible on both mobile and desktop) -->
-        <div class="upload-section">
-          <div class="upload-card" id="inline-add-container">
-            <div class="file-upload-zone" id="file-upload-zone">
+          <!-- Real-Time Terminal Telemetry Line -->
+          <div class="hero-terminal-stream">
+            <span class="term-prompt">&gt;</span>
+            <span class="term-status-text" id="hero-term-status">INITIALIZING SECURE ENVIRONMENT... CRYPTOGRAPHIC ENGINE: READY [AES-GCM-256] • FILE PROCESSOR: READY • PROTECTION LAYER: ACTIVE</span>
+          </div>
+        </section>
+
+        <!-- Protection Workflow Container -->
+        <section class="upload-section" id="protection-workflow">
+          <div class="upload-card cyber-panel-container" id="inline-add-container">
+            
+            <!-- Corner Brackets for HUD Styling -->
+            <span class="hud-corner top-left"></span>
+            <span class="hud-corner top-right"></span>
+            <span class="hud-corner bottom-left"></span>
+            <span class="hud-corner bottom-right"></span>
+
+            <!-- 1. Dropzone Interface -->
+            <div class="file-upload-zone cyber-drop-zone" id="file-upload-zone">
               <input type="file" id="file-input" class="file-input-hidden" />
-              <div class="upload-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-              </div>
-              <div class="upload-text">
-                <strong>Choose a file</strong>
-                <span>or drag and drop here</span>
-              </div>
-              <div class="upload-hint">Supports all file types</div>
-            </div>
+              
+              <!-- Scanning Radar Grid Animation -->
+              <div class="cyber-radar-scan"></div>
 
-            <div id="file-preview" class="file-preview hidden">
-              <div class="file-preview-icon">📄</div>
-              <div class="file-preview-info">
-                <span id="file-preview-name">filename.pdf</span>
-                <span id="file-preview-size">2.5 MB</span>
-              </div>
-              <button type="button" id="file-remove-btn" class="file-remove-btn">✕</button>
-            </div>
-
-            <div id="inline-password-section" class="input-group password-section hidden" style="margin-bottom: 0;">
-              <label for="new-password">🔐 Set Password</label>
-              <div style="position: relative; display: flex; align-items: center;">
-                <input type="password" id="new-password" placeholder="Enter secure password"
-                  style="width: 100%; padding-right: 44px;" />
-                <button type="button" id="toggle-new-password"
-                  style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--text-3); padding: 0; display: flex; align-items: center;"
-                  title="Toggle Password Visibility">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                    class="eye-icon">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
+              <div class="cyber-shield-container">
+                <div class="cyber-shield-ring"></div>
+                <div class="upload-icon cyber-shield-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <rect x="9" y="11" width="6" height="5" rx="1" ry="1"></rect>
+                    <path d="M10 11V9.5a2 2 0 0 1 4 0V11"></path>
                   </svg>
+                </div>
+              </div>
+
+              <div class="upload-text cyber-upload-text">
+                <strong class="cyber-drop-primary" id="drop-text-primary">DROP FILE TO SECURE</strong>
+                <span class="cyber-drop-secondary" id="drop-text-secondary">or click to browse local file system</span>
+              </div>
+
+              <div class="upload-hint cyber-upload-hint">
+                <span class="hint-tag">SUPPORTS</span> DOCUMENTS • IMAGES • VIDEO • AUDIO • ARCHIVES <span class="size-tag">(UP TO 150 MB)</span>
+              </div>
+            </div>
+
+            <!-- 2. File Detection & Inspection Card -->
+            <div id="file-preview" class="file-preview cyber-file-inspection hidden">
+              <div class="inspection-header">
+                <div class="inspection-tag">
+                  <span class="inspection-dot"></span>
+                  <span>FILE DETECTED // SECURITY INSPECTION</span>
+                </div>
+                <button type="button" id="file-remove-btn" class="cyber-btn-remove" title="Remove file">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  <span>REMOVE FILE</span>
                 </button>
               </div>
-              <div class="password-strength">
-                <div id="strength-bar" class="strength-bar"></div>
-                <span id="strength-text" class="strength-text">Enter a password</span>
+
+              <div class="inspection-body">
+                <div class="inspection-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                </div>
+                <div class="inspection-details">
+                  <h3 id="file-preview-name" class="inspection-filename">filename.pdf</h3>
+                  <div class="inspection-meta-grid">
+                    <div class="meta-item">
+                      <span class="meta-label">SIZE</span>
+                      <span id="file-preview-size" class="meta-val">2.84 MB</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">STATUS</span>
+                      <span class="meta-val status-ready">READY FOR PROTECTION</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">SECURITY</span>
+                      <span class="meta-val status-pending">PENDING ENCRYPTION</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">CIPHER</span>
+                      <span class="meta-val cyber-cyan">AES-256-GCM</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <input type="radio" name="auth-mode" value="always" checked style="display:none">
-              <input type="hidden" id="expiry-date" value="">
-              <input type="hidden" id="file-note" value="">
-              <div class="modal-actions" style="margin-top: var(--s4); border-top: none; padding-top: 0;">
-                <button id="cancel-add" class="btn-ghost">Cancel</button>
-                <button id="confirm-add" class="btn-primary">Protect File</button>
+            </div>
+
+            <!-- 3. Protection Policy & Password Section -->
+            <div id="inline-password-section" class="password-section cyber-protection-policy-section hidden">
+              
+              <!-- Standard Security Policy: Always Ask Password -->
+              <div class="policy-container">
+                <div class="cyber-policy-standard-box">
+                  <div class="policy-standard-left">
+                    <div class="policy-standard-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="2"/></svg>
+                    </div>
+                    <div class="policy-standard-info">
+                      <div class="policy-standard-header">
+                        <span class="policy-standard-title">ENFORCED POLICY: ALWAYS ASK PASSWORD</span>
+                        <span class="policy-level-badge level-very-high">ZERO-KNOWLEDGE // STRICT</span>
+                      </div>
+                      <p class="policy-standard-desc">Every decryption and viewing event strictly requires credential verification. Encryption keys are never cached insecurely.</p>
+                    </div>
+                  </div>
+                  <input type="hidden" name="auth-mode" id="policy-always" value="always" checked />
+                  <input type="hidden" id="expiry-date" value="" />
+                  <input type="hidden" id="file-note" value="" />
+                </div>
+              </div>
+
+              <!-- Security Credential Form -->
+              <div class="credential-container">
+                <div class="cyber-section-title">
+                  <span class="cyber-icon-mini">🔑</span>
+                  <span>SECURITY CREDENTIAL</span>
+                </div>
+                
+                <div class="credential-input-wrapper">
+                  <label for="new-password" class="cyber-input-label">ENTER PROTECTION PASSWORD</label>
+                  <div class="cyber-input-group">
+                    <div class="cyber-input-wrap">
+                      <input type="password" id="new-password" placeholder="Enter high-entropy protection password"
+                        class="cyber-input cyber-password-input" autocomplete="new-password" />
+                      <button type="button" id="toggle-new-password" class="cyber-input-addon-btn"
+                        title="Toggle Password Visibility">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                          class="eye-icon">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    <button type="button" id="generate-pwd-btn" class="cyber-btn cyber-btn-outline cyber-btn-gen"
+                      title="Generate cryptographically strong 16-character passphrase">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                      <span>GENERATE SECURE PASSWORD</span>
+                    </button>
+                  </div>
+
+                  <!-- Password Strength Meter -->
+                  <div class="password-strength cyber-strength-meter">
+                    <div class="strength-track">
+                      <div id="strength-bar" class="strength-bar"></div>
+                    </div>
+                    <div class="strength-meta">
+                      <span class="strength-title">ENTROPY STRENGTH:</span>
+                      <span id="strength-text" class="strength-text">ENTER PASSWORD</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Form Action Buttons -->
+                <div class="modal-actions cyber-form-actions">
+                  <button type="button" id="cancel-add" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+                  <button type="button" id="confirm-add" class="cyber-btn cyber-btn-primary cyber-btn-protect">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>PROTECT FILE</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- 4. Live File Protection Process Interface -->
+            <div id="protection-process-container" class="cyber-process-container hidden">
+              <div class="process-header">
+                <div class="process-title-group">
+                  <div class="cyber-kicker">CRYPTOGRAPHIC SUB-ROUTINE ACTIVE</div>
+                  <h3 class="process-title">ENCRYPTING FILE PAYLOAD</h3>
+                </div>
+                <div class="process-timer-badge">
+                  <span class="timer-dot"></span>
+                  <span id="process-timer-display">00:00.00</span>
+                  <span class="timer-divider" style="opacity:0.35;margin:0 4px;">|</span>
+                  <span>AES-GCM-256</span>
+                </div>
+              </div>
+
+              <!-- Holographic Security Scanner Ring Animation -->
+              <div class="scanner-stage">
+                <div class="holo-scanner-ring outer-ring"></div>
+                <div class="holo-scanner-ring middle-ring"></div>
+                <div class="holo-scanner-ring inner-scanner"></div>
+                <div class="scanner-laser-line"></div>
+                <div class="scanner-center-shield">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                  <span class="scanner-text" id="scanner-status-text">SECURING</span>
+                </div>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="process-progress-bar-wrap">
+                <div class="cyber-progress-shell">
+                  <div id="protect-progress-bar" class="cyber-progress-fill" style="width: 0%;"></div>
+                </div>
+                <div class="progress-metric-line">
+                  <span id="protect-progress-label">CRYPTOGRAPHIC INITIALIZATION...</span>
+                  <span id="protect-progress-percent" class="cyber-cyan">0%</span>
+                </div>
+              </div>
+
+              <!-- Real-Time Process Step Checklist -->
+              <div class="process-steps-grid">
+                <div class="process-step" id="step-analysis"><span class="step-icon">[ ]</span> <span class="step-text">FILE ANALYSIS</span></div>
+                <div class="process-step" id="step-prep"><span class="step-icon">[ ]</span> <span class="step-text">FILE PREPARATION</span></div>
+                <div class="process-step" id="step-kdf"><span class="step-icon">[ ]</span> <span class="step-text">PBKDF2 KEY DERIVATION</span></div>
+                <div class="process-step" id="step-encrypt"><span class="step-icon">[ ]</span> <span class="step-text">ENCRYPTION PROCESS</span></div>
+                <div class="process-step" id="step-meta"><span class="step-icon">[ ]</span> <span class="step-text">PROTECTION METADATA</span></div>
+                <div class="process-step" id="step-finalize"><span class="step-icon">[ ]</span> <span class="step-text">FINALIZING SECURE PACKAGE</span></div>
+                <div class="process-step" id="step-output"><span class="step-icon">[ ]</span> <span class="step-text">STANDALONE HTML GENERATION</span></div>
+                <div class="process-step" id="step-verify"><span class="step-icon">[ ]</span> <span class="step-text">SECURITY VERIFICATION</span></div>
+              </div>
+
+              <!-- Technical Terminal Console -->
+              <div class="cyber-terminal-panel">
+                <div class="terminal-bar">
+                  <div class="terminal-dots">
+                    <span class="dot red"></span><span class="dot amber"></span><span class="dot green"></span>
+                  </div>
+                  <span class="terminal-title">SECURITY CONSOLE // EXECUTION STREAM</span>
+                  <span class="terminal-chip">ZERO-KNOWLEDGE</span>
+                </div>
+                <div id="security-terminal-body" class="terminal-console-body">
+                  <p class="term-line">&gt; Initializing secure processor...</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Completion Screen & Protected HTML Download Experience -->
+            <div id="protection-complete-container" class="cyber-completion-container hidden">
+              <div class="completion-icon-wrapper">
+                <div class="completion-halo"></div>
+                <div class="completion-shield-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                </div>
+              </div>
+
+              <div class="completion-header-text">
+                <div class="cyber-kicker kicker-green">● PROTECTION PROTOCOL COMPLETE</div>
+                <h2 class="completion-title">FILE SUCCESSFULLY PROTECTED</h2>
+                <p class="completion-desc">Your protected file has been packaged into a standalone protected HTML file with embedded military-grade decryption runtime.</p>
+              </div>
+
+              <!-- Protected Output Security Card -->
+              <div class="completion-card cyber-security-card">
+                <div class="card-status-strip">
+                  <span class="strip-badge">PROTECTED OUTPUT</span>
+                  <span class="strip-status">STATUS: READY</span>
+                </div>
+                <div class="card-grid">
+                  <div class="card-row"><span class="card-key">FILE:</span> <strong id="complete-file-name" class="card-val">-</strong></div>
+                  <div class="card-row"><span class="card-key">PROTECTION:</span> <strong class="card-val cyber-cyan">AES-256-GCM</strong></div>
+                  <div class="card-row"><span class="card-key">STATUS:</span> <strong class="card-val cyber-green">SECURED</strong></div>
+                  <div class="card-row"><span class="card-key">INTEGRITY:</span> <strong class="card-val cyber-green">VERIFIED</strong></div>
+                  <div class="card-row"><span class="card-key">FORMAT:</span> <strong class="card-val">Protected HTML (.secure.html)</strong></div>
+                </div>
+              </div>
+
+              <!-- Primary Download Button -->
+              <div class="completion-actions-area">
+                <button type="button" id="download-protected-html-btn" class="cyber-btn cyber-btn-primary cyber-btn-download-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>DOWNLOAD PROTECTED HTML</span>
+                </button>
+                <p class="download-caption">Self-contained encrypted package. Recipient only requires any standard web browser and the authorization password.</p>
+              </div>
+
+              <div class="completion-secondary-actions">
+                <button type="button" id="view-in-vault-btn" class="cyber-btn cyber-btn-secondary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                  <span>VIEW IN VAULT</span>
+                </button>
+                <button type="button" id="protect-another-btn" class="cyber-btn cyber-btn-ghost">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span>PROTECT ANOTHER FILE</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ============ SECURED FILES ARCHIVE ============ -->
+        <section class="secured-files-section">
+          <!-- Toolbar -->
+          <div class="toolbar cyber-toolbar">
+            <div class="search-box cyber-search-box">
+              <svg class="search-icon-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="search-input" placeholder="Search encrypted files in vault..." class="search-input cyber-search-input" />
+            </div>
+            
+            <div class="sort-wrapper">
+              <select id="sort-select" class="sort-select cyber-select">
+                <option value="date-desc">Newest First</option>
+                <option value="date-asc">Oldest First</option>
+                <option value="name-asc">Name A–Z</option>
+                <option value="name-desc">Name Z–A</option>
+                <option value="size-desc">Largest First</option>
+                <option value="size-asc">Smallest First</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Bulk Actions Toolbar -->
+          <div id="bulk-actions" class="bulk-actions cyber-bulk-actions hidden">
+            <span id="selected-count" class="selected-count-badge">0 selected</span>
+            <button id="select-all-btn" class="cyber-btn cyber-btn-sm cyber-btn-secondary">Select All</button>
+            <button id="bulk-delete-btn" class="cyber-btn cyber-btn-sm cyber-btn-danger">Delete Selected</button>
+            <button id="bulk-export-btn" class="cyber-btn cyber-btn-sm cyber-btn-primary">Export Selected</button>
+            <button id="cancel-select-btn" class="cyber-btn cyber-btn-sm cyber-btn-ghost">Cancel</button>
+          </div>
+
+          <!-- Drag & Drop Full Overlay -->
+          <div id="drop-zone" class="drop-zone cyber-full-drop-zone hidden">
+            <div class="drop-zone-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </div>
+            <p class="drop-zone-title">DROP FILE TO INITIALIZE DEFENSE CONTAINER</p>
+            <span class="drop-zone-sub">Zero-knowledge AES-256 client-side encryption</span>
+          </div>
+
+          <!-- Secured Files Heading -->
+          <div id="secured-files-heading" class="secured-files-header">
+            <div class="secured-heading-left">
+              <div class="cyber-heading-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <div>
+                <h2 class="secured-title">PROTECTED VAULT ARCHIVE</h2>
+                <span class="secured-subtitle">Stored safely in client-side zero-knowledge encrypted database</span>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Bulk Actions -->
-        <div id="bulk-actions" class="bulk-actions hidden">
-          <span id="selected-count">0 selected</span>
-          <button id="select-all-btn" class="btn-select-all">Select All</button>
-          <button id="bulk-delete-btn" class="btn-danger">Delete Selected</button>
-          <button id="bulk-export-btn" class="btn-ghost">Export Selected</button>
-          <button id="cancel-select-btn" class="btn-ghost">Cancel</button>
-        </div>
-
-        <!-- Drag & Drop Overlay -->
-        <div id="drop-zone" class="drop-zone hidden">
-          <div class="drop-zone-icon">📁</div>
-          <p>Drop files here to encrypt</p>
-        </div>
-
-        <!-- Secured Files Heading -->
-        <div id="secured-files-heading">
-          <div class="secured-heading-left">
-            <span class="heading-icon">🔒</span>
-            <h2>Secured Files</h2>
+          <!-- File Grid -->
+          <div id="file-list" class="file-grid cyber-file-grid">
+            <div class="empty-state cyber-empty-state">
+              <div class="empty-icon-ring">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <h3 class="empty-title">NO PROTECTED FILES FOUND</h3>
+              <p class="empty-desc">Drop a file in the upload zone above to initialize protection.</p>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <!-- File List -->
-        <main id="file-list" class="file-grid">
-          <div class="empty-state">
-            <span class="empty-icon">📂</span>
-            <h3>No secured files yet</h3>
-            <p>Drop a file in the upload zone to get started.</p>
-          </div>
-        </main>
-
-      </div><!-- /.app-main -->
+      </main><!-- /.app-main -->
 
     </div><!-- /.app-body -->
 
 
-    <!-- Modals -->
+    <!-- ============ CYBERSECURITY MODALS ============ -->
 
-
-    <dialog id="auth-modal" class="modal">
-      <div class="modal-content">
-        <h2>Unlock File</h2>
-        <p id="auth-file-name"></p>
-        <div class="input-group">
-          <input type="password" id="auth-password" placeholder="Enter password" />
+    <!-- Unlock / Auth Modal -->
+    <dialog id="auth-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">AUTHENTICATION REQUIRED</div>
+          <h2 class="cyber-modal-title">DECRYPT PROTECTED FILE</h2>
         </div>
-        <div class="modal-actions">
-          <button id="cancel-auth" class="btn-ghost">Cancel</button>
-          <button id="confirm-auth" class="btn-primary">Unlock</button>
+        <p id="auth-file-name" class="cyber-modal-filename">-</p>
+        <div class="input-group">
+          <label for="auth-password" class="cyber-input-label">SECURITY CREDENTIAL</label>
+          <div class="cyber-input-wrap">
+            <input type="password" id="auth-password" placeholder="Enter file access password" class="cyber-input cyber-password-input" autofocus />
+            <button type="button" id="toggle-auth-password" class="cyber-input-addon-btn" title="Toggle Password Visibility">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="eye-icon">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="modal-actions cyber-modal-actions">
+          <button id="cancel-auth" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+          <button id="confirm-auth" class="cyber-btn cyber-btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>UNLOCK PAYLOAD</span>
+          </button>
         </div>
       </div>
     </dialog>
 
     <!-- Viewer Overlay -->
-    <div id="viewer" class="viewer-overlay hidden">
-      <header class="viewer-header">
-        <button id="close-viewer" class="btn-icon" title="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-        <button id="viewer-download-btn" class="btn-icon hidden" title="Download" style="margin-left: 8px;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-        </button>
-        <span id="viewer-filename">filename.jpg</span>
-        <span id="viewer-timer" class="hidden">Destructing...</span>
+    <div id="viewer" class="viewer-overlay cyber-viewer-overlay hidden">
+      <header class="viewer-header cyber-viewer-header">
+        <div class="viewer-left-actions">
+          <button id="close-viewer" class="btn-icon cyber-btn-icon" title="Close Viewer">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <button id="viewer-download-btn" class="btn-icon cyber-btn-icon hidden" title="Download Decrypted File">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="viewer-file-info">
+          <span class="viewer-shield-badge">SECURE VIEW</span>
+          <span id="viewer-filename" class="viewer-title">filename.jpg</span>
+        </div>
+        <div class="viewer-right-status">
+          <span id="viewer-timer" class="cyber-timer-tag hidden"></span>
+        </div>
       </header>
-      <div id="viewer-content" class="viewer-content"></div>
+      <div id="viewer-content" class="viewer-content cyber-viewer-body"></div>
     </div>
 
     <!-- File Info Modal -->
-    <dialog id="info-modal" class="modal">
-      <div class="modal-content">
-        <h2>📄 File Details</h2>
-        <div class="info-grid">
-          <div class="info-row"><strong>Name:</strong> <span id="info-name">-</span></div>
-          <div class="info-row"><strong>Type:</strong> <span id="info-type">-</span></div>
-          <div class="info-row"><strong>Size:</strong> <span id="info-size">-</span></div>
-          <div class="info-row"><strong>Added:</strong> <span id="info-date">-</span></div>
-          <div class="info-row"><strong>Mode:</strong> <span id="info-mode">-</span></div>
-          <div class="info-row"><strong>Expires:</strong> <span id="info-expires">Never</span></div>
-          <div class="info-row"><strong>Views:</strong> <span id="info-views">0</span></div>
+    <dialog id="info-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">CRYPTOGRAPHIC AUDIT</div>
+          <h2 class="cyber-modal-title">FILE INSPECTION REPORT</h2>
+        </div>
+        <div class="info-grid cyber-info-grid">
+          <div class="info-row"><span class="info-k">FILE NAME</span> <span id="info-name" class="info-v">-</span></div>
+          <div class="info-row"><span class="info-k">MIME TYPE</span> <span id="info-type" class="info-v">-</span></div>
+          <div class="info-row"><span class="info-k">FILE SIZE</span> <span id="info-size" class="info-v">-</span></div>
+          <div class="info-row"><span class="info-k">PROTECTED ON</span> <span id="info-date" class="info-v">-</span></div>
+          <div class="info-row"><span class="info-k">POLICY MODE</span> <span id="info-mode" class="info-v cyber-cyan">Always Ask Password</span></div>
+          <div class="info-row" style="display:none !important;"><span class="info-k">EXPIRATION</span> <span id="info-expires" class="info-v">Never</span></div>
+          <div class="info-row" style="display:none !important;"><span class="info-k">VIEW COUNT</span> <span id="info-views" class="info-v">0</span></div>
           <span id="info-note" style="display:none">-</span>
         </div>
-        <h4>📋 Access Log</h4>
-        <div id="access-log" class="access-log">No access history</div>
-        <div class="modal-actions">
-          <button id="close-info" class="btn-primary">Close</button>
+        <h4 class="cyber-log-header">ACCESS AUDIT LOG</h4>
+        <div id="access-log" class="access-log cyber-access-log">No access history</div>
+        <div class="modal-actions cyber-modal-actions">
+          <button id="close-info" class="cyber-btn cyber-btn-primary">CLOSE REPORT</button>
         </div>
       </div>
     </dialog>
 
     <!-- Rename Modal -->
-    <dialog id="rename-modal" class="modal">
-      <div class="modal-content">
-        <h2>✏️ Rename File</h2>
-        <div class="input-group">
-          <label for="rename-input">New Name</label>
-          <input type="text" id="rename-input" placeholder="Enter new file name" />
+    <dialog id="rename-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">METADATA MUTATION</div>
+          <h2 class="cyber-modal-title">RENAME PROTECTED PAYLOAD</h2>
         </div>
-        <div class="modal-actions">
-          <button id="cancel-rename" class="btn-ghost">Cancel</button>
-          <button id="confirm-rename" class="btn-primary">Rename</button>
+        <div class="input-group">
+          <label for="rename-input" class="cyber-input-label">NEW PAYLOAD IDENTIFIER</label>
+          <input type="text" id="rename-input" placeholder="Enter new file name" class="cyber-input" />
+        </div>
+        <div class="modal-actions cyber-modal-actions">
+          <button id="cancel-rename" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+          <button id="confirm-rename" class="cyber-btn cyber-btn-primary">UPDATE IDENTIFIER</button>
         </div>
       </div>
     </dialog>
 
     <!-- Change Password Modal -->
-    <dialog id="change-pass-modal" class="modal">
-      <div class="modal-content">
-        <h2>🔑 Change Password</h2>
-        <p id="change-pass-file"></p>
+    <dialog id="change-pass-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">CREDENTIAL ROTATION</div>
+          <h2 class="cyber-modal-title">ROTATE PROTECTION KEY</h2>
+        </div>
+        <p id="change-pass-file" class="cyber-modal-filename">-</p>
         <div class="input-group">
-          <label>Current Password</label>
-          <input type="password" id="current-password" placeholder="Enter current password" />
+          <label class="cyber-input-label">CURRENT PASSWORD</label>
+          <input type="password" id="current-password" placeholder="Enter current password" class="cyber-input" />
         </div>
         <div class="input-group">
-          <label>New Password</label>
-          <input type="password" id="new-password-change" placeholder="Enter new password" />
+          <label class="cyber-input-label">NEW ROTATION PASSWORD</label>
+          <input type="password" id="new-password-change" placeholder="Enter new password" class="cyber-input" />
         </div>
         <div class="input-group">
-          <label>Confirm New Password</label>
-          <input type="password" id="confirm-password-change" placeholder="Confirm new password" />
+          <label class="cyber-input-label">CONFIRM ROTATION PASSWORD</label>
+          <input type="password" id="confirm-password-change" placeholder="Confirm new password" class="cyber-input" />
         </div>
-        <div class="modal-actions">
-          <button id="cancel-change-pass" class="btn-ghost">Cancel</button>
-          <button id="confirm-change-pass" class="btn-primary">Update Password</button>
+        <div class="modal-actions cyber-modal-actions">
+          <button id="cancel-change-pass" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+          <button id="confirm-change-pass" class="cyber-btn cyber-btn-primary">RE-KEY CONTAINER</button>
         </div>
       </div>
     </dialog>
 
-
-
     <!-- Share Modal -->
-    <dialog id="share-modal" class="modal">
-      <div class="modal-content">
-        <h2>📤 Secure Share</h2>
-        <div class="input-group">
-          <label>File Password (Original)</label>
-          <input type="password" id="share-password" placeholder="Enter original file password">
+    <dialog id="share-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">EXPORT PROTOCOL</div>
+          <h2 class="cyber-modal-title">EXPORT STANDALONE SECURE HTML</h2>
         </div>
         <div class="input-group">
-          <label>Custom Title (Optional)</label>
-          <input type="text" id="share-title" placeholder="SecureVault">
+          <label class="cyber-input-label">FILE AUTHORIZATION PASSWORD</label>
+          <div class="cyber-input-wrap">
+            <input type="password" id="share-password" placeholder="Enter original file password" class="cyber-input cyber-password-input">
+            <button type="button" id="toggle-share-password" class="cyber-input-addon-btn" title="Toggle Password Visibility">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="eye-icon">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
         </div>
         <div class="input-group">
-          <label>Custom Logo (Optional)</label>
-          <div class="logo-upload-zone" id="share-logo-zone">
+          <label class="cyber-input-label">BRAND / SYSTEM TITLE (OPTIONAL)</label>
+          <input type="text" id="share-title" placeholder="Coralgenz Vault" class="cyber-input">
+        </div>
+        <div class="input-group">
+          <label class="cyber-input-label">CUSTOM EMBEDDED LOGO (OPTIONAL)</label>
+          <div class="logo-upload-zone cyber-logo-drop" id="share-logo-zone">
             <input type="file" id="share-logo" accept="image/*" class="file-input-hidden">
             <div class="upload-icon-small">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
             </div>
-            <span id="share-logo-text">Choose File</span>
+            <span id="share-logo-text" class="logo-drop-text">Choose Logo File</span>
           </div>
-          <p class="hint">Upload your brand logo for the login screen.</p>
+          <p class="hint cyber-hint">Brand logo rendered inside standalone exported HTML login terminal.</p>
         </div>
-        <div class="modal-actions">
-          <button id="cancel-share" class="btn-ghost">Cancel</button>
-          <button id="confirm-share" class="btn-primary">Export Secure File</button>
+        <div class="modal-actions cyber-modal-actions">
+          <button id="cancel-share" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+          <button id="confirm-share" class="cyber-btn cyber-btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>EXPORT SECURE FILE</span>
+          </button>
         </div>
       </div>
     </dialog>
 
-    <!-- Stub Note Modal (hidden, for bundled JS compatibility) -->
+    <!-- Stub Note Modal -->
     <dialog id="note-modal" class="modal" style="display:none">
       <div class="modal-content">
         <div class="input-group"><textarea id="edit-note" style="display:none"></textarea></div>
@@ -424,311 +786,173 @@
     </dialog>
 
     <!-- Settings Modal -->
-    <dialog id="settings-modal" class="modal">
-      <div class="modal-content" style="position: relative;">
-        <button id="close-settings-x" class="btn-ghost"
-          style="position: absolute; top: var(--s4); left: var(--s4); padding: 0; min-height: unset; height: 32px; width: 32px; display: flex; align-items: center; justify-content: center; z-index: 10;"
-          title="Close">
+    <dialog id="settings-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content cyber-settings-dialog">
+        <button id="close-settings-x" class="cyber-modal-close" title="Close Settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-        <h2>⚙️ Settings</h2>
-
-        <!-- Stats and Security -->
-        <div class="settings-section">
-          <h4>📊 Statistics & Security</h4>
-          <div class="security-banner"
-            style="border-radius: var(--radius-md); margin-bottom: var(--space-3); border: 1px solid var(--color-border-subtle); padding: var(--space-2) var(--space-3);">
-            <div class="security-status">
-              <div class="security-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                  <polyline points="9 12 11 14 15 10"></polyline>
-                </svg>
-              </div>
-              <span>AES-256 Encryption Active</span>
-            </div>
-            <div class="security-badge">Secure</div>
-          </div>
-          <div id="stats-dashboard" class="stats-dashboard"
-            style="border-radius: var(--radius-md); padding: var(--space-3); border: 1px solid var(--color-border-subtle);">
-            <div class="stat-card">
-              <div class="stat-icon">📁</div>
-              <div class="stat-value" id="stat-total">0</div>
-              <div class="stat-label">Files</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">🖼️</div>
-              <div class="stat-value" id="stat-images">0</div>
-              <div class="stat-label">Images</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">🎬</div>
-              <div class="stat-value" id="stat-videos">0</div>
-              <div class="stat-label">Videos</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">💾</div>
-              <div class="stat-value" id="stat-size">0</div>
-              <div class="stat-label">MB Used</div>
-            </div>
-          </div>
+        
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">CONFIGURATION MATRIX</div>
+          <h2 class="cyber-modal-title">SYSTEM PREFERENCES & SECURITY</h2>
         </div>
 
-        <!-- App Lock -->
-        <div class="settings-section">
-          <h4>🔒 App Lock</h4>
-          <p class="hint">Set a password to lock the web app. Remember the password, if you forget you can't reset. To
-            use the "Forgot Password" feature, enable the recovery method by adding questions below.</p>
-          <div class="input-group display-flex gap-2">
-            <input type="password" id="app-lock-password" placeholder="New App Password" />
-            <button id="set-app-lock" class="btn-small">Set</button>
+        <!-- Download Permissions -->
+        <div class="settings-section cyber-settings-card">
+          <div class="settings-card-header-row" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <h4 class="settings-card-title" style="margin-bottom:0;">DOWNLOAD POLICIES</h4>
           </div>
-          <button id="remove-app-lock" class="btn-ghost" style="margin-top: 5px; width: 100%">Remove App Lock</button>
-
-          <!-- Recovery Method -->
-          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--gray-200);">
-            <h5 style="margin: 12px 0 8px; font-size: 14px;">🔑 Recovery Method (Optional)</h5>
-            <div class="input-group display-flex gap-2 mb-2">
-              <input type="text" id="recovery-question" placeholder="Security Question (e.g. Pet's Name)"
-                style="font-size: 13px;" />
-            </div>
-            <div class="input-group display-flex gap-2">
-              <input type="password" id="recovery-answer" placeholder="Security Answer" style="font-size: 13px;" />
-              <button id="set-recovery" class="btn-small">Save</button>
-            </div>
-            <p id="recovery-status" class="hint" style="margin-top: 4px; color: var(--green-600); display: none;">✅
-              Recovery method set</p>
-          </div>
-        </div>
-
-        <!-- Download Settings -->
-        <div class="settings-section">
-          <h4>Download Permissions</h4>
-          <div class="setting-item" style="margin-bottom: 12px; padding: 0;">
+          <p class="hint cyber-hint" style="margin-bottom: 12px;">Controls whether decrypted files can be extracted or saved to disk after opening. When disabled, recipients can only view files in the secure in-browser runtime.</p>
+          <div class="setting-item">
             <label class="switch-wrapper" for="dl-media-toggle">
-              <span class="switch-label-text">Allow Media Download (Img, Vid, Aud)</span>
-              <div style="position:relative; display:flex; align-items:center;">
+              <div class="switch-label-col">
+                <span class="switch-label-text">Allow Media Export (Images, Video, Audio)</span>
+                <span id="dl-media-status-badge" class="policy-status-badge allowed">ALLOWED</span>
+              </div>
+              <div class="switch-container">
                 <input type="checkbox" id="dl-media-toggle" class="switch-input" />
-                <span class="switch-slider"></span>
+                <span class="switch-slider cyber-slider"></span>
               </div>
             </label>
           </div>
-          <div class="setting-item" style="margin-bottom: 12px; padding: 0;">
+          <div class="setting-item">
             <label class="switch-wrapper" for="dl-doc-toggle">
-              <span class="switch-label-text">Allow Document Download (PDF, Doc, Excel)</span>
-              <div style="position:relative; display:flex; align-items:center;">
+              <div class="switch-label-col">
+                <span class="switch-label-text">Allow Document Export (PDF, Office, Spreadsheets)</span>
+                <span id="dl-doc-status-badge" class="policy-status-badge allowed">ALLOWED</span>
+              </div>
+              <div class="switch-container">
                 <input type="checkbox" id="dl-doc-toggle" class="switch-input" />
-                <span class="switch-slider"></span>
+                <span class="switch-slider cyber-slider"></span>
               </div>
             </label>
           </div>
         </div>
 
-        <!-- Panic Settings -->
-        <div class="settings-section">
-          <h4 style="color:var(--red-500); display:flex; align-items:center; gap:8px;">
-            🚨 Panic Button
-          </h4>
-          <div class="setting-item" style="margin-bottom: 12px; padding: 0;">
+        <!-- Panic Trigger Settings -->
+        <div class="settings-section cyber-settings-card border-danger">
+          <h4 class="settings-card-title danger-title">🚨 PANIC PROTOCOL CONFIGURATION</h4>
+          <div class="setting-item">
             <label class="switch-wrapper" for="panic-enable-toggle">
-              <span class="switch-label-text">Enable Panic Button</span>
-              <div style="position:relative; display:flex; align-items:center;">
+              <span class="switch-label-text">Enable Immediate Panic Trigger Button</span>
+              <div class="switch-container">
                 <input type="checkbox" id="panic-enable-toggle" class="switch-input" />
-                <span class="switch-slider"></span>
+                <span class="switch-slider cyber-slider slider-red"></span>
               </div>
             </label>
           </div>
           <div id="panic-settings-content">
-            <p class="hint">Action to perform on panic press:</p>
+            <p class="hint cyber-hint">Action executed on panic button activation:</p>
             <div class="setting-item">
-              <select id="panic-action-select" class="sort-select" style="width:100%">
-                <option value="lock" selected>Lock Screen Immediately (Default)</option>
-                <option value="blur">Blur Screen & Reload</option>
-                <option value="loading">Fake Loading Screen</option>
-                <option value="erase">❌ Erase All Data</option>
-                <option value="none">No Action</option>
+              <select id="panic-action-select" class="sort-select cyber-select" style="width:100%">
+                <option value="blur" selected>Blur Screen &amp; Display Reload Error (Default)</option>
+                <option value="loading">Display Fake Loading Loop</option>
+                <option value="erase">❌ Emergency Wipe: Erase All Local Data</option>
+                <option value="none">Disabled</option>
               </select>
             </div>
           </div>
         </div>
 
-        <!-- General Settings -->
-        <div class="settings-section">
-          <h4>🛠️ Preferences</h4>
-
-          <div class="setting-item">
-            <label>Auto-Lock Timer</label>
-            <select id="auto-lock-time">
-              <option value="60000">1 minute</option>
-              <option value="300000" selected>5 minutes</option>
-              <option value="600000">10 minutes</option>
-              <option value="1800000">30 minutes</option>
-              <option value="0">Never</option>
-            </select>
-          </div>
-
-
-        </div>
-
         <!-- About & Support -->
-        <div class="settings-section">
-          <h4>💬 About & Support</h4>
-          <p class="hint">Have suggestions or found a bug?</p>
-          <button id="feedback-btn" class="btn-ghost" style="width:100%">Send Feedback</button>
+        <div class="settings-section cyber-settings-card">
+          <h4 class="settings-card-title">🛡️ CORALGENZ SECURITY PLATFORM</h4>
+          <p class="hint cyber-hint">Architecture: Client-side WebCrypto API (PBKDF2-SHA256 600K rounds + AES-GCM-256). Zero remote server key transmission.</p>
+          <button id="feedback-btn" class="cyber-btn cyber-btn-ghost" style="width:100%">SEND TELEMETRY FEEDBACK</button>
         </div>
 
-
-
-
-
-
-
-
-
-        <div class="modal-actions">
-          <button id="close-settings" class="btn-primary">Close</button>
+        <div class="modal-actions cyber-modal-actions">
+          <button id="close-settings" class="cyber-btn cyber-btn-primary">APPLY &amp; CLOSE</button>
         </div>
       </div>
     </dialog>
-
-    <!-- App Lock Screen Overlay -->
-    <div id="app-lock-screen" class="hidden">
-      <div class="lock-card">
-        <div class="lock-icon-large">🔒</div>
-        <h2>SecureVault Locked</h2>
-        <p>Please enter your access password</p>
-        <input type="password" id="lock-input" placeholder="Enter password" autofocus>
-        <button id="unlock-submit" class="btn-primary">Unlock Access</button>
-        <button id="forgot-password-btn" class="btn-text" style="width: 100%; margin-top: 16px;">Forgot
-          Password?</button>
-      </div>
-    </div>
 
     <!-- Help Modal -->
-    <dialog id="help-modal" class="modal">
-      <div class="modal-content large-modal">
-        <h2>📘 User Guide</h2>
-        <div class="help-content">
-          <section>
-            <h3>📱 iPhone Users</h3>
-            <p><strong>Install an HTML viewer to access on iPhone</strong></p>
-            <p>To ensure the best experience when opening exported files on iOS, we recommend using a dedicated HTML
-              viewer app.</p>
-          </section>
-
-          <section>
-            <h3>🚀 Getting Started</h3>
-            <p><strong>SecureVault</strong> is a privacy-focused file storage app. All files are encrypted on your
-              device using your password.</p>
-            <ul>
-              <li><strong>Import Files:</strong> Drag & drop files anywhere or tap the <strong>"click here to protect
-                  your files"</strong>
-                button at the bottom.</li>
-              <li><strong>Encryption:</strong> Every file receives a unique encryption key protected by your password.
-              </li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>🔒 Security</h3>
-            <p><strong>Always Ask:</strong> For maximum security, SecureVault requires your password every time you open
-              a file. This ensures your data remains protected even if someone gains access to your device.</p>
-          </section>
-
-          <section>
-            <h3>� Panic Button (New)</h3>
-            <p>Top header <strong>red icon</strong> for instant security.</p>
-            <p>Customize behavior in Settings:</p>
-            <ul>
-              <li><strong>Blur Screen (Default):</strong> Blurs content & shows reload error. Tap icon to restore.</li>
-              <li><strong>Fake Loading:</strong> Displays fake loading spinner.</li>
-              <li><strong>Lock Screen:</strong> Instantly locks app (requires App Lock).</li>
-              <li><strong>Erase Data:</strong> ⚠️ Permanently wipes ALL data immediately!</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>�📤 Secure Sharing</h3>
-            <p>Share files safely with anyone, even if they don't have the app:</p>
-            <ol>
-              <li>Click the <strong>Share</strong> button on a file.</li>
-              <li>Set a password to protect the file.</li>
-              <li>Optionally add a custom title and logo for branding.</li>
-              <li>Download the secure HTML file and send it to the recipient.</li>
-              <li>The recipient opens the HTML file in any browser, enters the password, and views the content securely.
-              </li>
-            </ol>
-            <p><em>Note: Expiry dates and View Once settings are preserved in shared files!</em></p>
-          </section>
-
-          <section>
-            <h3>⚡ Advanced Features</h3>
-            <ul>
-              <li><strong>Auto-Delete:</strong> Set an expiry date/time when adding a file. It will be automatically
-                deleted when time is up.</li>
-              <li><strong>File Notes:</strong> Add descriptions to your files for easy organization.</li>
-              <li><strong>Bulk Actions:</strong> Use the checkboxes to select multiple files for deletion or export.
-              </li>
-              <li><strong>App Lock:</strong> Set a master password in Settings to lock the entire app.</li>
-              <li><strong>Auto-Lock Timer:</strong> Configure automatic locking after inactivity.</li>
-            </ul>
-          </section>
-
+    <dialog id="help-modal" class="modal cyber-modal">
+      <div class="modal-content large-modal cyber-modal-content">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">OPERATIONAL BRIEF</div>
+          <h2 class="cyber-modal-title">CORALGENZ VAULT USER &amp; SECURITY GUIDE</h2>
         </div>
-        <div class="modal-actions">
-          <button id="close-help" class="btn-primary">Got it!</button>
+        <div class="help-content cyber-help-content">
+          <section>
+            <h3>🛡️ ZERO-TRUST ARCHITECTURE</h3>
+            <p><strong>Coralgenz Vault</strong> performs 100% of cryptographic operations within the isolated sandbox of your web browser. Neither passwords nor plaintext files are ever transmitted to any external server.</p>
+          </section>
+
+          <section>
+            <h3>🔐 ENCRYPTION STANDARD</h3>
+            <p>Each file receives a distinct 256-bit AES-GCM data key wrapped using PBKDF2 with 600,000 SHA-256 iterations and unique 128-bit cryptographic salt and initialization vectors (IV).</p>
+          </section>
+
+          <section>
+            <h3>📤 STANDALONE PROTECTED HTML PACKAGES</h3>
+            <p>When you protect or export a file, you can download it as a <strong>.secure.html</strong> package. This self-contained digital fortress file includes:</p>
+            <ul>
+              <li>The encrypted payload blob</li>
+              <li>A lightweight, zero-dependency browser decryptor</li>
+              <li>Enforced credential authentication policy (Always Ask Password)</li>
+              <li>No internet connection required for decryption</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3>🚨 PANIC EMERGENCY TRIGGER</h3>
+            <p>In high-risk environments, tap the red <strong>PANIC</strong> button in the top navigation bar to immediately lock the screen or scrub sensitive in-memory payloads according to your settings.</p>
+          </section>
+        </div>
+        <div class="modal-actions cyber-modal-actions">
+          <button id="close-help" class="cyber-btn cyber-btn-primary">ACKNOWLEDGED</button>
         </div>
       </div>
     </dialog>
 
-  </div>
+  </div><!-- /#app -->
 
   <!-- Custom Prompt Modal (Mobile-Friendly) -->
-  <dialog id="custom-prompt-modal" class="modal">
-    <div class="modal-content">
-      <h2 id="prompt-title">Enter Value</h2>
-      <p id="prompt-message" class="prompt-message"></p>
+  <dialog id="custom-prompt-modal" class="modal cyber-modal">
+    <div class="modal-content cyber-modal-content">
+      <h2 id="prompt-title" class="cyber-modal-title">Enter Value</h2>
+      <p id="prompt-message" class="prompt-message cyber-prompt-message"></p>
       <div class="input-group">
-        <input type="text" id="prompt-input" placeholder="Enter value..." autocomplete="off" />
+        <input type="text" id="prompt-input" placeholder="Enter value..." class="cyber-input" autocomplete="off" />
       </div>
-      <div class="modal-actions">
-        <button id="prompt-cancel" class="btn-ghost">Cancel</button>
-        <button id="prompt-confirm" class="btn-primary">Confirm</button>
+      <div class="modal-actions cyber-modal-actions">
+        <button id="prompt-cancel" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+        <button id="prompt-confirm" class="cyber-btn cyber-btn-primary">CONFIRM</button>
       </div>
     </div>
   </dialog>
 
   <!-- Custom Confirm Modal (Mobile-Friendly) -->
-  <dialog id="custom-confirm-modal" class="modal">
-    <div class="modal-content">
-      <h2 id="confirm-title">Confirm</h2>
-      <p id="confirm-message" class="confirm-message"></p>
-      <div class="modal-actions">
-        <button id="confirm-cancel" class="btn-ghost">Cancel</button>
-        <button id="confirm-ok" class="btn-primary">OK</button>
+  <dialog id="custom-confirm-modal" class="modal cyber-modal">
+    <div class="modal-content cyber-modal-content">
+      <h2 id="confirm-title" class="cyber-modal-title">Confirm</h2>
+      <p id="confirm-message" class="confirm-message cyber-prompt-message"></p>
+      <div class="modal-actions cyber-modal-actions">
+        <button id="confirm-cancel" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+        <button id="confirm-ok" class="cyber-btn cyber-btn-primary">OK</button>
       </div>
     </div>
   </dialog>
 
   <!-- Custom Alert Modal (Mobile-Friendly) -->
-  <dialog id="custom-alert-modal" class="modal">
-    <div class="modal-content">
-      <h2 id="alert-title">Notice</h2>
-      <p id="alert-message" class="alert-message"></p>
-      <div class="modal-actions">
-        <button id="alert-ok" class="btn-primary">OK</button>
+  <dialog id="custom-alert-modal" class="modal cyber-modal">
+    <div class="modal-content cyber-modal-content">
+      <h2 id="alert-title" class="cyber-modal-title">Notice</h2>
+      <p id="alert-message" class="alert-message cyber-prompt-message"></p>
+      <div class="modal-actions cyber-modal-actions">
+        <button id="alert-ok" class="cyber-btn cyber-btn-primary">ACKNOWLEDGE</button>
       </div>
     </div>
   </dialog>
 
-
-
   <script>
+    // Native password eye toggle listener for immediate responsive feedback
     document.addEventListener('DOMContentLoaded', () => {
       const toggleBtn = document.getElementById('toggle-new-password');
       const passwordInput = document.getElementById('new-password');
@@ -737,12 +961,12 @@
           e.preventDefault();
           if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
-            toggleBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
-            toggleBtn.style.color = 'var(--blue-500)';
+            toggleBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="23" x2="23" y2="1"></line></svg>';
+            toggleBtn.style.color = 'var(--cyber-cyan)';
           } else {
             passwordInput.type = 'password';
-            toggleBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
-            toggleBtn.style.color = 'var(--gray-400)';
+            toggleBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+            toggleBtn.style.color = 'var(--cyber-muted)';
           }
         });
       }
