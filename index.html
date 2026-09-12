@@ -788,6 +788,7 @@
     <!-- Settings Modal -->
     <dialog id="settings-modal" class="modal cyber-modal">
       <div class="modal-content cyber-modal-content cyber-settings-dialog">
+        <div class="mobile-sheet-pill" aria-hidden="true"></div>
         <button id="close-settings-x" class="cyber-modal-close" title="Close Settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -797,76 +798,116 @@
         </button>
         
         <div class="cyber-modal-header">
-          <div class="cyber-modal-tag">CONFIGURATION MATRIX</div>
-          <h2 class="cyber-modal-title">SYSTEM PREFERENCES & SECURITY</h2>
+          <div class="cyber-modal-tag">SYSTEM CONFIGURATION</div>
+          <h2 class="cyber-modal-title">PREFERENCES &amp; SECURITY</h2>
         </div>
 
-        <!-- Download Permissions -->
-        <div class="settings-section cyber-settings-card">
-          <div class="settings-card-header-row" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <h4 class="settings-card-title" style="margin-bottom:0;">DOWNLOAD POLICIES</h4>
-          </div>
-          <p class="hint cyber-hint" style="margin-bottom: 12px;">Controls whether decrypted files can be extracted or saved to disk after opening. When disabled, recipients can only view files in the secure in-browser runtime.</p>
-          <div class="setting-item">
-            <label class="switch-wrapper" for="dl-media-toggle">
-              <div class="switch-label-col">
-                <span class="switch-label-text">Allow Media Export (Images, Video, Audio)</span>
-                <span id="dl-media-status-badge" class="policy-status-badge allowed">ALLOWED</span>
+        <div class="settings-scroll-body">
+          <!-- Download Permissions -->
+          <div class="settings-section cyber-settings-card">
+            <div class="settings-card-header-row">
+              <h4 class="settings-card-title"><span class="card-title-icon">📥</span> DOWNLOAD POLICIES</h4>
+            </div>
+            <p class="hint cyber-hint">Enforces whether decrypted files can be extracted locally or viewed strictly within the browser sandbox.</p>
+            
+            <div class="settings-items-list">
+              <div class="setting-item">
+                <label class="switch-wrapper" for="dl-media-toggle">
+                  <div class="switch-label-col">
+                    <span class="switch-item-icon">🖼️</span>
+                    <div class="switch-item-info">
+                      <span class="switch-label-text">Media Export</span>
+                      <span class="switch-subtext">Images, Audio &amp; Video files</span>
+                    </div>
+                  </div>
+                  <div class="switch-right-side">
+                    <span id="dl-media-status-badge" class="policy-status-badge allowed">ALLOWED</span>
+                    <div class="switch-container">
+                      <input type="checkbox" id="dl-media-toggle" class="switch-input" />
+                      <span class="switch-slider cyber-slider"></span>
+                    </div>
+                  </div>
+                </label>
               </div>
-              <div class="switch-container">
-                <input type="checkbox" id="dl-media-toggle" class="switch-input" />
-                <span class="switch-slider cyber-slider"></span>
-              </div>
-            </label>
-          </div>
-          <div class="setting-item">
-            <label class="switch-wrapper" for="dl-doc-toggle">
-              <div class="switch-label-col">
-                <span class="switch-label-text">Allow Document Export (PDF, Office, Spreadsheets)</span>
-                <span id="dl-doc-status-badge" class="policy-status-badge allowed">ALLOWED</span>
-              </div>
-              <div class="switch-container">
-                <input type="checkbox" id="dl-doc-toggle" class="switch-input" />
-                <span class="switch-slider cyber-slider"></span>
-              </div>
-            </label>
-          </div>
-        </div>
 
-        <!-- Panic Trigger Settings -->
-        <div class="settings-section cyber-settings-card border-danger">
-          <h4 class="settings-card-title danger-title">🚨 PANIC PROTOCOL CONFIGURATION</h4>
-          <div class="setting-item">
-            <label class="switch-wrapper" for="panic-enable-toggle">
-              <span class="switch-label-text">Enable Immediate Panic Trigger Button</span>
-              <div class="switch-container">
-                <input type="checkbox" id="panic-enable-toggle" class="switch-input" />
-                <span class="switch-slider cyber-slider slider-red"></span>
+              <div class="setting-item">
+                <label class="switch-wrapper" for="dl-doc-toggle">
+                  <div class="switch-label-col">
+                    <span class="switch-item-icon">📑</span>
+                    <div class="switch-item-info">
+                      <span class="switch-label-text">Document Export</span>
+                      <span class="switch-subtext">PDF, DOCX, XLSX &amp; CSV files</span>
+                    </div>
+                  </div>
+                  <div class="switch-right-side">
+                    <span id="dl-doc-status-badge" class="policy-status-badge allowed">ALLOWED</span>
+                    <div class="switch-container">
+                      <input type="checkbox" id="dl-doc-toggle" class="switch-input" />
+                      <span class="switch-slider cyber-slider"></span>
+                    </div>
+                  </div>
+                </label>
               </div>
-            </label>
-          </div>
-          <div id="panic-settings-content">
-            <p class="hint cyber-hint">Action executed on panic button activation:</p>
-            <div class="setting-item">
-              <select id="panic-action-select" class="sort-select cyber-select" style="width:100%">
-                <option value="blur" selected>Blur Screen &amp; Display Reload Error (Default)</option>
-                <option value="loading">Display Fake Loading Loop</option>
-                <option value="erase">❌ Emergency Wipe: Erase All Local Data</option>
-                <option value="none">Disabled</option>
-              </select>
             </div>
           </div>
+
+          <!-- Panic Trigger Settings -->
+          <div class="settings-section cyber-settings-card border-danger">
+            <div class="settings-card-header-row">
+              <h4 class="settings-card-title danger-title"><span class="card-title-icon">🚨</span> PANIC PROTOCOL</h4>
+            </div>
+            <p class="hint cyber-hint">Immediate emergency action triggered by the header Panic button.</p>
+            
+            <div class="settings-items-list">
+              <div class="setting-item">
+                <label class="switch-wrapper" for="panic-enable-toggle">
+                  <div class="switch-label-col">
+                    <span class="switch-item-icon">🛡️</span>
+                    <div class="switch-item-info">
+                      <span class="switch-label-text">Header Panic Button</span>
+                      <span class="switch-subtext">Show one-tap lockdown trigger</span>
+                    </div>
+                  </div>
+                  <div class="switch-container">
+                    <input type="checkbox" id="panic-enable-toggle" class="switch-input" />
+                    <span class="switch-slider cyber-slider slider-red"></span>
+                  </div>
+                </label>
+              </div>
+
+              <div id="panic-settings-content" class="panic-action-config">
+                <label class="cyber-input-label" for="panic-action-select">Triggered Action:</label>
+                <div class="cyber-select-wrapper">
+                  <select id="panic-action-select" class="sort-select cyber-select" style="width:100%">
+                    <option value="blur" selected>🔒 Blur Screen &amp; Privacy Shield (Default)</option>
+                    <option value="loading">⏳ Display Fake Loading Screen</option>
+                    <option value="erase">❌ Emergency Wipe: Erase All Local Data</option>
+                    <option value="none">Disabled</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- About & Support -->
+          <div class="settings-section cyber-settings-card">
+            <div class="settings-card-header-row">
+              <h4 class="settings-card-title"><span class="card-title-icon">🛡️</span> ARCHITECTURE &amp; SPECS</h4>
+            </div>
+            <div class="security-tech-chips">
+              <span class="tech-chip"><span class="chip-dot green"></span> AES-256-GCM</span>
+              <span class="tech-chip"><span class="chip-dot cyan"></span> PBKDF2-600K</span>
+              <span class="tech-chip"><span class="chip-dot purple"></span> Zero-Knowledge</span>
+            </div>
+            <p class="hint cyber-hint">100% Client-side WebCrypto execution. Encryption keys never leave your device.</p>
+            <button id="feedback-btn" class="cyber-btn cyber-btn-ghost cyber-btn-sm" style="width:100%">
+              <span>SEND TELEMETRY FEEDBACK</span>
+            </button>
+          </div>
         </div>
 
-        <!-- About & Support -->
-        <div class="settings-section cyber-settings-card">
-          <h4 class="settings-card-title">🛡️ CORALGENZ SECURITY PLATFORM</h4>
-          <p class="hint cyber-hint">Architecture: Client-side WebCrypto API (PBKDF2-SHA256 600K rounds + AES-GCM-256). Zero remote server key transmission.</p>
-          <button id="feedback-btn" class="cyber-btn cyber-btn-ghost" style="width:100%">SEND TELEMETRY FEEDBACK</button>
-        </div>
-
-        <div class="modal-actions cyber-modal-actions">
-          <button id="close-settings" class="cyber-btn cyber-btn-primary">APPLY &amp; CLOSE</button>
+        <div class="modal-actions cyber-modal-actions settings-sticky-actions">
+          <button id="close-settings" class="cyber-btn cyber-btn-primary" style="width:100%">APPLY &amp; CLOSE</button>
         </div>
       </div>
     </dialog>

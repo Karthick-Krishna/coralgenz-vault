@@ -2305,38 +2305,89 @@ body::before {
 
 /* Settings Dialog Specifics */
 .cyber-settings-dialog {
-  max-width: 620px;
+  max-width: 580px;
   max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 20px 18px 20px;
+  gap: 14px;
+}
+
+.mobile-sheet-pill {
+  display: none;
+}
+
+.settings-scroll-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+  max-height: calc(85vh - 150px);
+  -webkit-overflow-scrolling: touch;
 }
 
 .cyber-settings-card {
-  padding: 14px;
-  background: rgba(5, 7, 10, 0.6);
+  padding: 14px 16px;
+  background: rgba(8, 14, 26, 0.7);
   border: 1px solid var(--cyber-border-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cyber-settings-card:hover {
+  border-color: rgba(0, 240, 255, 0.3);
 }
 
 .cyber-settings-card.border-danger {
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(26, 10, 14, 0.4);
+}
+
+.cyber-settings-card.border-danger:hover {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.settings-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .settings-card-title {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.danger-title { color: var(--cyber-red); }
+.card-title-icon {
+  font-size: 1rem;
+}
+
+.danger-title { 
+  color: #f87171; 
+}
 
 .cyber-hint {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
   color: var(--cyber-text-muted);
+}
+
+.settings-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .setting-item {
@@ -2344,6 +2395,15 @@ body::before {
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease;
+}
+
+.setting-item:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .switch-wrapper {
@@ -2355,19 +2415,48 @@ body::before {
   color: var(--cyber-text-secondary);
   user-select: none;
   gap: 12px;
+  width: 100%;
+  min-height: 40px;
 }
 
 .switch-label-col {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.switch-item-icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.switch-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .switch-label-text {
-  font-size: 0.8rem;
-  color: var(--cyber-text-secondary);
-  font-weight: 500;
+  font-size: 0.84rem;
+  color: #f3f4f6;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.switch-subtext {
+  font-size: 0.72rem;
+  color: var(--cyber-text-muted);
+  line-height: 1.3;
+}
+
+.switch-right-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .policy-status-badge {
@@ -2375,7 +2464,7 @@ body::before {
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 4px;
   text-transform: uppercase;
   transition: all 0.2s ease;
@@ -2395,21 +2484,61 @@ body::before {
   box-shadow: 0 0 8px rgba(255, 51, 102, 0.15);
 }
 
-.recovery-section {
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--cyber-border-subtle);
+.panic-action-config {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.recovery-subtitle {
+.security-tech-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.tech-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 6px;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--cyber-cyan);
+  font-size: 0.72rem;
+  color: #e5e7eb;
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.chip-dot.green {
+  background: var(--cyber-green);
+  box-shadow: 0 0 6px var(--cyber-green);
+}
+
+.chip-dot.cyan {
+  background: var(--cyber-cyan);
+  box-shadow: 0 0 6px var(--cyber-cyan);
+}
+
+.chip-dot.purple {
+  background: #c084fc;
+  box-shadow: 0 0 6px #c084fc;
+}
+
+.settings-sticky-actions {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cyber-border-subtle);
 }
 
 .switch-container {
@@ -3186,25 +3315,77 @@ body::before {
     width: 100%;
   }
 
-  /* Dialogs & Modals Mobile */
+  /* Dialogs & Modals Mobile Bottom-Sheet Behavior */
   .cyber-modal {
-    padding: 10px;
+    padding: 0;
+    margin: auto auto 0 auto !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
   }
 
   .cyber-modal-content {
-    width: 95vw !important;
-    max-width: 95vw !important;
-    max-height: 88vh;
-    padding: 18px 14px;
-    border-radius: var(--radius-md);
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 90vh;
+    padding: 16px 14px;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  .mobile-sheet-pill {
+    display: block;
+    width: 38px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    margin: -4px auto 10px auto;
+    flex-shrink: 0;
   }
 
   .cyber-settings-dialog {
-    max-height: 88vh;
+    max-height: 90vh;
+    padding: 14px 14px 12px 14px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-scroll-body {
+    max-height: calc(90vh - 165px);
+    padding-right: 2px;
+    margin-right: 0;
+    gap: 12px;
+  }
+
+  .cyber-settings-card {
+    padding: 12px 12px;
+    gap: 10px;
+  }
+
+  .setting-item {
+    padding: 12px 10px;
+    min-height: 48px;
+  }
+
+  .switch-wrapper {
+    gap: 10px;
+  }
+
+  .switch-label-col {
+    gap: 10px;
+  }
+
+  .switch-label-text {
+    font-size: 0.82rem;
+  }
+
+  .switch-subtext {
+    font-size: 0.7rem;
   }
 
   .large-modal {
-    max-height: 88vh;
+    max-height: 90vh;
   }
 
   .cyber-modal-actions {
@@ -3214,6 +3395,12 @@ body::before {
 
   .cyber-modal-actions .cyber-btn {
     width: 100%;
+  }
+
+  .settings-sticky-actions {
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+    margin-top: 6px;
+    padding-top: 10px;
   }
 
   /* Viewer Overlay Mobile */
