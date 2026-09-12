@@ -3094,58 +3094,71 @@ function initCyberHackerEffects() {
       let width = (canvas.width = window.innerWidth);
       let height = (canvas.height = window.innerHeight);
 
-      const chars = '0123456789ABCDEF•:;><[]{}/*~$=+!#@%&_AES-256GCMKEYPBKDF2';
+      const chars = '0123456789ABCDEF0x7F0x2A•:;><[]{}/*~$=+!#@%&_AES-256GCMKEYPBKDF2SHA256AUTH_TAG';
       const charArr = chars.split('');
       const fontSize = 13;
       let columns = Math.floor(width / fontSize);
       let drops = [];
+      let speeds = [];
 
       function resetDrops() {
         width = canvas.width = window.innerWidth;
         height = canvas.height = window.innerHeight;
         columns = Math.floor(width / fontSize);
         drops = [];
+        speeds = [];
         for (let i = 0; i < columns; i++) {
-          drops[i] = Math.random() * -50;
+          drops[i] = Math.random() * -60;
+          speeds[i] = 0.8 + Math.random() * 1.2;
         }
       }
       resetDrops();
       window.addEventListener('resize', resetDrops);
 
       let lastTime = 0;
-      const interval = 45; // ~22fps for smooth matrix flow without CPU strain
+      const interval = 33; // ~30fps for ultra-smooth fluid matrix flow
 
       function drawMatrix(timestamp) {
         requestAnimationFrame(drawMatrix);
         if (timestamp - lastTime < interval) return;
         lastTime = timestamp;
 
-        ctx.fillStyle = 'rgba(5, 7, 10, 0.14)';
+        ctx.fillStyle = 'rgba(5, 7, 10, 0.12)';
         ctx.fillRect(0, 0, width, height);
 
-        ctx.font = `${fontSize}px "JetBrains Mono", monospace`;
+        ctx.font = `600 ${fontSize}px "JetBrains Mono", monospace`;
 
         for (let i = 0; i < drops.length; i++) {
           const text = charArr[Math.floor(Math.random() * charArr.length)];
           const x = i * fontSize;
           const y = drops[i] * fontSize;
 
-          // Head of stream is bright cyan/white, tail is subtle cyan/green
-          if (Math.random() > 0.9) {
-            ctx.fillStyle = '#00f0ff';
+          // Head of stream has neon laser glow, tail has cyber-cyan / green tint
+          const isLead = Math.random() > 0.88;
+          if (isLead) {
+            ctx.fillStyle = '#ffffff';
             ctx.shadowColor = '#00f0ff';
-            ctx.shadowBlur = 6;
+            ctx.shadowBlur = 10;
+          } else if (i % 3 === 0) {
+            ctx.fillStyle = 'rgba(0, 240, 255, 0.65)';
+            ctx.shadowColor = '#00f0ff';
+            ctx.shadowBlur = 4;
+          } else if (i % 3 === 1) {
+            ctx.fillStyle = 'rgba(0, 255, 136, 0.55)';
+            ctx.shadowColor = '#00ff88';
+            ctx.shadowBlur = 3;
           } else {
-            ctx.fillStyle = i % 2 === 0 ? 'rgba(0, 240, 255, 0.45)' : 'rgba(0, 255, 136, 0.4)';
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
             ctx.shadowBlur = 0;
           }
 
           ctx.fillText(text, x, y);
 
-          if (y > height && Math.random() > 0.975) {
+          if (y > height && Math.random() > 0.96) {
             drops[i] = 0;
+            speeds[i] = 0.8 + Math.random() * 1.2;
           }
-          drops[i]++;
+          drops[i] += speeds[i];
         }
       }
       requestAnimationFrame(drawMatrix);
@@ -3176,10 +3189,26 @@ function initCyberHackerEffects() {
         termStatus.style.opacity = '1';
         termStatus.style.transform = 'translateY(0)';
       }, 300);
-    }, 4500);
+    }, 4000);
   }
 
-  // 3. Smooth Active Nav Observer for Mobile & Desktop
+  // 3. Cyber Interactive Sparks on Button Clicks
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest('.cyber-btn, .btn-icon, .cyber-nav-link, .cyber-drop-zone');
+    if (!target) return;
+
+    const rect = target.getBoundingClientRect();
+    const ripple = document.createElement('span');
+    ripple.className = 'cyber-click-glow-ripple';
+    ripple.style.left = `${e.clientX - rect.left}px`;
+    ripple.style.top = `${e.clientY - rect.top}px`;
+    target.style.position = target.style.position || 'relative';
+    target.appendChild(ripple);
+
+    setTimeout(() => ripple.remove(), 600);
+  });
+
+  // 4. Smooth Active Nav Observer for Mobile & Desktop
   const sections = [
     { el: document.getElementById('hero-command'), navId: 'nav-item-console' },
     { el: document.getElementById('inline-add-container'), navId: 'nav-item-protect' },

@@ -8,6 +8,12 @@
   <meta name="description" content="Coralgenz Vault — Enterprise-Grade High-Security Cryptographic File Protection System with Zero-Knowledge AES-256 Encryption." />
   <title>Coralgenz Vault — Secure File Protection System</title>
 
+  <!-- App Icons & Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,12 +31,7 @@
     <header class="header cyber-header">
       <div class="logo">
         <div class="logo-icon cyber-logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-svg">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" class="shield-outline"></path>
-            <rect x="9" y="11" width="6" height="5" rx="1" ry="1" class="shield-lock-body"></rect>
-            <path d="M10 11V9.5a2 2 0 0 1 4 0V11" class="shield-shackle"></path>
-          </svg>
+          <img src="/app-icon-cyber.png" alt="SecureVault Icon" class="header-app-icon" />
           <div class="logo-pulse cyber-pulse"></div>
         </div>
         <div class="logo-text">
@@ -254,8 +255,22 @@
               <!-- Scanning Radar Grid Animation -->
               <div class="cyber-radar-scan"></div>
 
+              <!-- Animated Drop Prompt & Visual Indicator -->
+              <div class="cyber-drop-animated-cue" aria-hidden="true">
+                <div class="drop-cue-badge">
+                  <span class="drop-cue-glow"></span>
+                  <span class="drop-cue-icon">📂</span>
+                  <span class="drop-cue-text">DROP FILE TO SECURE</span>
+                  <div class="drop-arrow-stream">
+                    <span class="stream-dot d1">▾</span>
+                    <span class="stream-dot d2">▾</span>
+                  </div>
+                </div>
+              </div>
+
               <div class="cyber-shield-container">
                 <div class="cyber-shield-ring"></div>
+                <div class="cyber-shield-pulse-wave"></div>
                 <div class="upload-icon cyber-shield-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -267,12 +282,12 @@
               </div>
 
               <div class="upload-text cyber-upload-text">
-                <strong class="cyber-drop-primary" id="drop-text-primary">DROP FILE TO SECURE</strong>
-                <span class="cyber-drop-secondary" id="drop-text-secondary">or click to browse local file system</span>
+                <strong class="cyber-drop-primary" id="drop-text-primary">SECURE VAULT DROPZONE</strong>
+                <span class="cyber-drop-secondary" id="drop-text-secondary">Drag &amp; drop file here or tap to select from device</span>
               </div>
 
               <div class="upload-hint cyber-upload-hint">
-                <span class="hint-tag">SUPPORTS</span> DOCUMENTS • IMAGES • VIDEO • AUDIO • ARCHIVES <span class="size-tag">(UP TO 150 MB)</span>
+                <span class="hint-tag">SUPPORTS</span> DOCUMENTS • MEDIA • ARCHIVES <span class="size-tag">(UP TO 150 MB)</span>
               </div>
             </div>
 
@@ -297,20 +312,20 @@
                   <h3 id="file-preview-name" class="inspection-filename">filename.pdf</h3>
                   <div class="inspection-meta-grid">
                     <div class="meta-item">
-                      <span class="meta-label">SIZE</span>
+                      <span class="meta-label">PAYLOAD SIZE</span>
                       <span id="file-preview-size" class="meta-val">2.84 MB</span>
                     </div>
                     <div class="meta-item">
-                      <span class="meta-label">STATUS</span>
-                      <span class="meta-val status-ready">READY FOR PROTECTION</span>
+                      <span class="meta-label">CRYPTO CIPHER</span>
+                      <span class="meta-val cyber-cyan">AES-256-GCM (MIL-SPEC)</span>
                     </div>
                     <div class="meta-item">
-                      <span class="meta-label">SECURITY</span>
-                      <span class="meta-val status-pending">PENDING ENCRYPTION</span>
+                      <span class="meta-label">KEY DERIVATION</span>
+                      <span class="meta-val cyber-purple">PBKDF2-600K SHA-256</span>
                     </div>
                     <div class="meta-item">
-                      <span class="meta-label">CIPHER</span>
-                      <span class="meta-val cyber-cyan">AES-256-GCM</span>
+                      <span class="meta-label">TARGET PACKAGE</span>
+                      <span class="meta-val cyber-green">STANDALONE .SECURE.HTML</span>
                     </div>
                   </div>
                 </div>
