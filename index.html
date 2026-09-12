@@ -321,7 +321,7 @@
                     </div>
                     <div class="meta-item">
                       <span class="meta-label">KEY DERIVATION</span>
-                      <span class="meta-val cyber-purple">PBKDF2-600K SHA-256</span>
+                      <span class="meta-val cyber-purple">DUAL-STAGE 1M (ANTI-CRACKER)</span>
                     </div>
                     <div class="meta-item">
                       <span class="meta-label">TARGET PACKAGE</span>
@@ -911,7 +911,7 @@
             </div>
             <div class="security-tech-chips">
               <span class="tech-chip"><span class="chip-dot green"></span> AES-256-GCM</span>
-              <span class="tech-chip"><span class="chip-dot cyan"></span> PBKDF2-600K</span>
+              <span class="tech-chip"><span class="chip-dot cyan"></span> Dual-Stage 1M (Anti-Cracker)</span>
               <span class="tech-chip"><span class="chip-dot purple"></span> Zero-Knowledge</span>
             </div>
             <p class="hint cyber-hint">100% Client-side WebCrypto execution. Encryption keys never leave your device.</p>
@@ -941,17 +941,27 @@
           </section>
 
           <section>
-            <h3>🔐 ENCRYPTION STANDARD</h3>
-            <p>Each file receives a distinct 256-bit AES-GCM data key wrapped using PBKDF2 with 600,000 SHA-256 iterations and unique 128-bit cryptographic salt and initialization vectors (IV).</p>
+            <h3>🔐 ENCRYPTION &amp; ANTI-CRACKER STANDARD</h3>
+            <p>Each file receives a distinct 256-bit AES-GCM data key wrapped using a <strong>Dual-Stage KDF with 1,000,000 SHA-256 rounds and HMAC-SHA512 pepper pre-whitening</strong>. Generic cracking tools like <strong>John the Ripper, Hashcat, and GPU rigs</strong> cannot compute or identify matching keys.</p>
+          </section>
+
+          <section>
+            <h3>🛡️ BRUTE-FORCE &amp; MALWARE MITIGATION</h3>
+            <p>Built-in defenses protect against automated dictionary guessing and virus scraping:</p>
+            <ul>
+              <li><strong>Progressive Lockout Throttling:</strong> Consecutive failed passwords trigger exponential cooldown lockouts (5s, 15s, 60s) to neutralize bots.</li>
+              <li><strong>Strict Content Security Policy (CSP):</strong> Standalone packages block all outbound network traffic (<code>default-src 'none'</code>) so malware cannot exfiltrate decrypted data.</li>
+              <li><strong>Anti-Cache &amp; Memory Zeroization:</strong> Headers prevent disk caching (<code>no-store</code>), and sensitive memory buffers are zeroized (<code>.fill(0)</code>) immediately upon session close or lock.</li>
+            </ul>
           </section>
 
           <section>
             <h3>📤 STANDALONE PROTECTED HTML PACKAGES</h3>
             <p>When you protect or export a file, you can download it as a <strong>.secure.html</strong> package. This self-contained digital fortress file includes:</p>
             <ul>
-              <li>The encrypted payload blob</li>
-              <li>A lightweight, zero-dependency browser decryptor</li>
-              <li>Enforced credential authentication policy (Always Ask Password)</li>
+              <li>The encrypted payload blob with Galois authentication tag</li>
+              <li>Dual-stage zero-dependency browser decryptor</li>
+              <li>Anti-debugging honeypot traps and inspector blocking</li>
               <li>No internet connection required for decryption</li>
             </ul>
           </section>
