@@ -1577,9 +1577,19 @@
     </div>
 
     <script>
+        if (typeof process === 'undefined') {
+            try {
+                const noop = () => {};
+                ['log', 'debug', 'info', 'warn', 'error', 'dir', 'table', 'trace'].forEach(m => {
+                    try { console[m] = noop; } catch (e) {}
+                });
+                if (typeof console.clear === 'function') console.clear();
+            } catch (e) {}
+        }
+
         const CONTAINER_VERSION = "V6";
-        const SALT_B64 = "0+u2qorXOGZBla4sGswKdDfqkuJdMY3vpwT7DzNThfk=";
-        const IV_B64 = "tzatPU+yRqxLiXwL";
+        const SALT_B64 = "rqYAA0BnVW/Xoc9TcwZPxyc9RW5napi/w/NVkWGRe1Y=";
+        const IV_B64 = "5sXmpywePS9YGvTR";
         const TYPE = "image/png";
         const NAME = "classified-blueprint.png";
         const SIZE = 43;
@@ -3176,13 +3186,43 @@
         });
         document.getElementById('screen-guard-overlay')?.addEventListener('click', restoreScreen);
 
-        // Trap Print (Ctrl+P / Cmd+P) and PrintScreen Keys
+        // Anti-Inspection & DevTools Interception
+        window.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, true);
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, true);
+
+        // Trap DevTools Shortcuts (F12, Ctrl+Shift+I, Cmd+Option+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S) & Print (Ctrl+P / Cmd+P)
         window.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+            if (e.key === 'F12' || e.keyCode === 123) {
                 e.preventDefault();
                 e.stopPropagation();
+                return false;
             }
-        });
+            if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey)) {
+                const k = (e.key || '').toLowerCase();
+                if (k === 'i' || k === 'j' || k === 'c' || k === 'k') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
+            if (e.ctrlKey || e.metaKey) {
+                const k = (e.key || '').toLowerCase();
+                if (k === 'u' || k === 's' || k === 'p') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
+        }, true);
+
         window.addEventListener('keyup', (e) => {
             if (e.key === 'PrintScreen' || e.keyCode === 44) {
                 obscureScreen();
@@ -3190,6 +3230,17 @@
                 setTimeout(restoreScreen, 1500);
             }
         });
+
+        // Anti-Debugging Constructor Trap: Halts execution if DevTools is opened
+        if (typeof process === 'undefined') {
+            setInterval(() => {
+                const start = performance.now();
+                (function() { return false; })['constructor']('debugger')();
+                if (performance.now() - start > 100) {
+                    lockSession();
+                }
+            }, 300);
+        }
 
         // Anti-Drag Exfiltration Protection
         document.addEventListener('dragstart', (e) => e.preventDefault());
@@ -3632,7 +3683,7 @@
         window.unlock = unlock;
         document.getElementById('unlock-btn')?.addEventListener('click', unlock);
 
-        const DATA = "fDM4JpU0iY0SCoRsyzrqJkGSZT+oxgk50Soh52C6Iqz6R+TyoDKLjpHvfOBvJU/tKvsCT0S1Fo52wc0=";
+        const DATA = "NsN2m5XS7WTVxiSKYlpQAnXu0Rn8euPeyl2SwyWKFOVOrgHJO0zYOvBOWjzUIk0f5m0AI3TNH5bUTd0=";
     </script>
 </body>
 </html>

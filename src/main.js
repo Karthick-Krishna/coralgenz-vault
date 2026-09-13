@@ -582,12 +582,18 @@ function setupEventListeners() {
     if (dropPrimary) dropPrimary.textContent = 'DROP FILE TO SECURE';
     if (dropSecondary) dropSecondary.textContent = 'or click to browse local file system';
   });
-  uploadZone?.addEventListener('drop', (e) => {
+  uploadZone?.addEventListener('drop', async (e) => {
     e.preventDefault();
     uploadZone.classList.remove('drag-over');
     if (dropPrimary) dropPrimary.textContent = 'DROP FILE TO SECURE';
     if (dropSecondary) dropSecondary.textContent = 'or click to browse local file system';
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
+      if (await checkSecureFile(droppedFile)) {
+        await showAlert('Already Secured', `"${droppedFile.name}" is already secured! Re-protecting an already secured file is not allowed.`);
+        if (fileInput) fileInput.value = '';
+        return;
+      }
       fileInput.files = e.dataTransfer.files;
       handleFileSelect();
     }
@@ -662,10 +668,46 @@ function resetAddForm() {
   updateProcessProgress(0, 'STANDBY');
 }
 
+function isSecureHtmlFile(file) {
+  if (!file) return false;
+  const fileName = (file.name || '').toLowerCase().trim();
+  if (fileName.endsWith('.secure.html') || /\.secure(?:\s*\(\d+\))?\.html$/i.test(fileName)) {
+    return true;
+  }
+  if (fileName.endsWith('.html') && fileName.includes('.secure')) {
+    return true;
+  }
+  return false;
+}
+
+async function checkSecureFile(file) {
+  if (!file) return false;
+  if (isSecureHtmlFile(file)) return true;
+  const fileName = (file.name || '').toLowerCase().trim();
+  if (fileName.endsWith('.html') && file.size < 20 * 1024 * 1024) {
+    try {
+      const slice = file.slice(0, 4096);
+      const text = await slice.text();
+      if (text.includes('Coralgenz Vault') && (text.includes('CONTAINER_VERSION') || text.includes('SALT_B64') || text.includes('vault-runtime') || text.includes('Military-Grade Content Security Policy'))) {
+        return true;
+      }
+    } catch (e) {}
+  }
+  return false;
+}
+
 // --- Feature: File Upload Preview ---
-function handleFileSelect() {
+async function handleFileSelect() {
   const file = fileInput.files[0];
   if (!file) return;
+
+  // Check if file is already a .secure.html container
+  if (await checkSecureFile(file)) {
+    await showAlert('Already Secured', `"${file.name}" is already secured! Re-protecting an already secured file is not allowed.`);
+    fileInput.value = '';
+    removeSelectedFile(new Event('cancel'));
+    return;
+  }
 
   // Limit file size to 150MB
   const MAX_SIZE = 150 * 1024 * 1024; // 150 MB
@@ -1347,6 +1389,13 @@ function setupDragDrop() {
     e.preventDefault();
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
+      for (const file of files) {
+        if (await checkSecureFile(file)) {
+          await showAlert('Already Secured', `"${file.name}" is already secured! Re-protecting an already secured file is not allowed.`);
+          if (fileInput) fileInput.value = '';
+          return;
+        }
+      }
       if (files.length === 1) {
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(files[0]);
@@ -1363,6 +1412,10 @@ function setupDragDrop() {
 }
 
 async function addFileFromDrop(file) {
+  if (await checkSecureFile(file)) {
+    await showAlert('Already Secured', `"${file.name}" is already secured! Re-protecting an already secured file is not allowed.`);
+    return;
+  }
   // Limit file size to 150MB
   const MAX_SIZE = 150 * 1024 * 1024; // 150 MB
   if (file.size > MAX_SIZE) {
@@ -3569,6 +3622,16 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
     </div>
 
     <script>
+        if (typeof process === 'undefined') {
+            try {
+                const noop = () => {};
+                ['log', 'debug', 'info', 'warn', 'error', 'dir', 'table', 'trace'].forEach(m => {
+                    try { console[m] = noop; } catch (e) {}
+                });
+                if (typeof console.clear === 'function') console.clear();
+            } catch (e) {}
+        }
+
         const CONTAINER_VERSION = ${jsonVersion};
         const SALT_B64 = ${jsonSalt};
         const IV_B64 = ${jsonIv};
@@ -5166,13 +5229,43 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
         });
         document.getElementById('screen-guard-overlay')?.addEventListener('click', restoreScreen);
 
-        // Trap Print (Ctrl+P / Cmd+P) and PrintScreen Keys
+        // Anti-Inspection & DevTools Interception
+        window.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, true);
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, true);
+
+        // Trap DevTools Shortcuts (F12, Ctrl+Shift+I, Cmd+Option+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S) & Print (Ctrl+P / Cmd+P)
         window.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+            if (e.key === 'F12' || e.keyCode === 123) {
                 e.preventDefault();
                 e.stopPropagation();
+                return false;
             }
-        });
+            if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey)) {
+                const k = (e.key || '').toLowerCase();
+                if (k === 'i' || k === 'j' || k === 'c' || k === 'k') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
+            if (e.ctrlKey || e.metaKey) {
+                const k = (e.key || '').toLowerCase();
+                if (k === 'u' || k === 's' || k === 'p') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
+        }, true);
+
         window.addEventListener('keyup', (e) => {
             if (e.key === 'PrintScreen' || e.keyCode === 44) {
                 obscureScreen();
@@ -5180,6 +5273,17 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                 setTimeout(restoreScreen, 1500);
             }
         });
+
+        // Anti-Debugging Constructor Trap: Halts execution if DevTools is opened
+        if (typeof process === 'undefined') {
+            setInterval(() => {
+                const start = performance.now();
+                (function() { return false; })['constructor']('debugger')();
+                if (performance.now() - start > 100) {
+                    lockSession();
+                }
+            }, 300);
+        }
 
         // Anti-Drag Exfiltration Protection
         document.addEventListener('dragstart', (e) => e.preventDefault());
@@ -5681,6 +5785,12 @@ async function handleAddFile() {
 
   if (!file) {
     await showAlert('Required', 'Please select a file to protect');
+    return;
+  }
+  if (await checkSecureFile(file)) {
+    await showAlert('Already Secured', `"${file.name}" is already secured! Re-protecting an already secured file is not allowed.`);
+    fileInput.value = '';
+    removeSelectedFile(new Event('cancel'));
     return;
   }
   if (!password) {

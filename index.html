@@ -38,12 +38,265 @@
     .hidden, [hidden], dialog:not([open]) {
       display: none !important;
     }
+
+    /* Enterprise Anti-Inspection Security Shield Overlay */
+    #vault-security-shield {
+      position: fixed;
+      inset: 0;
+      z-index: 99999999;
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.98), #030712);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      font-family: 'Inter', system-ui, sans-serif;
+      animation: shieldFadeIn 0.3s ease-out;
+    }
+    #vault-security-shield.shield-hidden {
+      display: none !important;
+    }
+    @keyframes shieldFadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .shield-card {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(225, 29, 72, 0.4);
+      box-shadow: 0 0 50px rgba(225, 29, 72, 0.25), 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+      border-radius: 16px;
+      padding: 36px 32px;
+      max-width: 520px;
+      width: 100%;
+    }
+    .shield-icon-wrap {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: rgba(225, 29, 72, 0.12);
+      border: 1px solid rgba(225, 29, 72, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      color: #f43f5e;
+      box-shadow: 0 0 20px rgba(225, 29, 72, 0.2);
+    }
+    .shield-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .shield-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(225, 29, 72, 0.15);
+      border: 1px solid rgba(225, 29, 72, 0.35);
+      color: #fb7185;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      margin-bottom: 16px;
+      letter-spacing: 0.05em;
+    }
+    .shield-desc {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .shield-reload-btn {
+      background: linear-gradient(135deg, #e11d48, #be123c);
+      color: #ffffff;
+      border: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 0.05em;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);
+    }
+    .shield-reload-btn:hover {
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+      box-shadow: 0 6px 20px rgba(225, 29, 72, 0.5);
+      transform: translateY(-1px);
+    }
   </style>
+
+  <!-- Security Guardian: Anti-Inspection, Anti-DevTools & Source Code Isolation -->
+  <script>
+    (function() {
+      'use strict';
+
+      // 1. Console Sanitization & Silence
+      try {
+        const noop = function() {};
+        ['log', 'debug', 'info', 'warn', 'error', 'dir', 'table', 'trace'].forEach(function(m) {
+          try { console[m] = noop; } catch(e) {}
+        });
+        if (typeof console.clear === 'function') console.clear();
+      } catch(e) {}
+
+      // 2. Prevent Right-Click Context Menu (Inspect Element Trigger)
+      window.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }, true);
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }, true);
+
+      // 3. Intercept DevTools & Source View Keyboard Shortcuts
+      window.addEventListener('keydown', function(e) {
+        // F12
+        if (e.key === 'F12' || e.keyCode === 123) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl+Shift+I / Cmd+Option+I (Inspect)
+        // Ctrl+Shift+J / Cmd+Option+J (Console)
+        // Ctrl+Shift+C / Cmd+Option+C (Elements)
+        // Ctrl+Shift+K (Firefox console)
+        if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey)) {
+          const k = (e.key || '').toLowerCase();
+          if (k === 'i' || k === 'j' || k === 'c' || k === 'k') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+        // Ctrl+U / Cmd+Option+U (View Page Source)
+        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 'u')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl+S / Cmd+S (Save Page)
+        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 's')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }, true);
+
+      // 4. Active DevTools Detection & Security Lockdown Shield
+      let isShieldActive = false;
+      function engageSecurityShield() {
+        if (isShieldActive) return;
+        isShieldActive = true;
+        
+        try {
+          // Clear any active session secrets
+          if (window.sessionStorage) window.sessionStorage.clear();
+        } catch(e) {}
+
+        const shield = document.getElementById('vault-security-shield');
+        if (shield) {
+          shield.classList.remove('shield-hidden');
+        }
+        const app = document.getElementById('app');
+        if (app) {
+          app.style.filter = 'blur(45px)';
+          app.style.opacity = '0.05';
+          app.style.pointerEvents = 'none';
+        }
+      }
+
+      function disengageSecurityShield() {
+        if (!isShieldActive) return;
+        isShieldActive = false;
+        const shield = document.getElementById('vault-security-shield');
+        if (shield) {
+          shield.classList.add('shield-hidden');
+        }
+        const app = document.getElementById('app');
+        if (app) {
+          app.style.filter = '';
+          app.style.opacity = '';
+          app.style.pointerEvents = '';
+        }
+      }
+
+      // Check DevTools via window size diff (docked DevTools)
+      function checkWindowDiff() {
+        const threshold = 160;
+        const widthDiff = window.outerWidth - window.innerWidth > threshold;
+        const heightDiff = window.outerHeight - window.innerHeight > threshold;
+        if (widthDiff || heightDiff) {
+          engageSecurityShield();
+        } else if (isShieldActive) {
+          disengageSecurityShield();
+        }
+      }
+      window.addEventListener('resize', checkWindowDiff);
+      setInterval(checkWindowDiff, 1000);
+
+      // 5. Anti-Debugging Dynamic Constructor Trap
+      // If DevTools is opened, pauses execution in anonymous constructor context
+      function startDebuggerTrap() {
+        setInterval(function() {
+          const startTime = performance.now();
+          (function() {
+            return false;
+          })['constructor']('debugger')();
+          const executionTime = performance.now() - startTime;
+          if (executionTime > 100) {
+            engageSecurityShield();
+          }
+        }, 300);
+      }
+      setTimeout(startDebuggerTrap, 800);
+
+    })();
+  </script>
 
   <script type="module" src="/src/main.js"></script>
 </head>
 
 <body class="cyber-fortress-theme">
+  <!-- Enterprise Anti-Inspection Lockdown Shield -->
+  <div id="vault-security-shield" class="shield-hidden">
+    <div class="shield-card">
+      <div class="shield-icon-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="shield-title">Security Protocol Engaged</div>
+      <div class="shield-status-badge">DEVELOPER INSPECTION DETECTED</div>
+      <p class="shield-desc">
+        Unauthorized browser inspection or debugging activity was detected. In accordance with zero-trust cryptographic defense, sensitive runtime memory and source artifacts have been isolated.
+      </p>
+      <button type="button" class="shield-reload-btn" onclick="window.location.reload()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        <span>RESTORE &amp; RELOAD VAULT</span>
+      </button>
+    </div>
+  </div>
+
   <!-- Matrix / Cyber Telemetry Ambient Canvas Background -->
   <canvas id="cyber-matrix-canvas" class="cyber-matrix-canvas"></canvas>
   <div class="cyber-grid-overlay"></div>
