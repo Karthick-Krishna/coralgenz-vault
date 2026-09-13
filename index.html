@@ -1229,85 +1229,350 @@
       </div>
     </dialog>
 
-    <!-- Help Modal -->
+    <!-- User Guide / Help Modal (Mobile-Optimized & User-Friendly) -->
     <dialog id="help-modal" class="modal cyber-modal">
-      <div class="modal-content large-modal cyber-modal-content">
-        <div class="cyber-modal-header">
-          <div class="cyber-modal-tag">OPERATIONAL BRIEF</div>
-          <h2 class="cyber-modal-title">CORALGENZ VAULT USER &amp; SECURITY GUIDE</h2>
+      <div class="modal-content large-modal cyber-modal-content help-modal-sheet">
+        <div class="mobile-sheet-pill" aria-hidden="true"></div>
+
+        <div class="cyber-modal-header help-modal-header">
+          <div class="help-header-left">
+            <div class="cyber-modal-tag"><span class="pulse-dot"></span> USER GUIDE // HOW TO USE</div>
+            <h2 class="cyber-modal-title">How to Use Coralgenz Vault</h2>
+            <p class="help-modal-subtitle">Step-by-step instructions to protect, share, and view your secret files.</p>
+          </div>
+          <button type="button" id="close-help-x" class="cyber-btn-icon cyber-btn-close-modal" title="Close guide" aria-label="Close guide">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
-        <div class="help-content cyber-help-content">
-          <section>
-            <h3>🛡️ ZERO-TRUST AIR-GAPPED ARCHITECTURE</h3>
-            <p><strong>Coralgenz Vault</strong> performs 100% of cryptographic operations within the isolated sandbox of your web browser. Neither passwords nor plaintext files are ever transmitted to any external server.</p>
-          </section>
 
-          <section>
-            <h3>📱 LOW-END HARDWARE ADAPTATION &amp; WEB WORKER OFFLOADING</h3>
-            <p>To ensure high-grade cryptographic security runs without freezing or lagging on low-end hardware (e.g., budget smartphones, low-spec tablets, 2GB RAM devices):</p>
-            <ul>
-              <li><strong>Background Web Worker Offloading:</strong> Massive 2,000,000-iteration computations are dispatched to isolated background worker threads. The browser's main UI thread stays at a fluid 60 FPS with zero frame drops or "Script Unresponsive" dialogs.</li>
-              <li><strong>Hardware Capability Detection:</strong> The system inspects available CPU cores and memory to calibrate non-blocking execution safely.</li>
-              <li><strong>Memory Stream Optimization:</strong> Single-pass buffer allocation and instant zeroization prevent mobile browser Out-Of-Memory (OOM) crashes.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>🔐 MILITARY-GRADE 2,000,000 ITERATIONS &amp; ANTI-CRACKER DEFENSE (V6)</h3>
-            <p>Each file receives a distinct 256-bit AES-GCM data key wrapped using a <strong>Dual-Stage KDF with 2,000,000 SHA-256 rounds and HMAC-SHA512 pepper pre-whitening</strong>. Generic cracking tools like <strong>John the Ripper, Hashcat, and GPU clusters</strong> cannot identify hashes, extract passwords, or execute automated dictionary attacks against this container format.</p>
-          </section>
-
-          <section>
-            <h3>🛡️ MULTI-LAYER SECURING &amp; DOWNLOADING FORTRESS</h3>
-            <p>Every file secured and downloaded undergoes multiple cascading defense layers:</p>
-            <ul>
-              <li><strong>Layer 1 — Hardware Entropy Injection:</strong> 256-bit hardware CSPRNG salt + 96-bit AES-GCM nonce generated per transaction.</li>
-              <li><strong>Layer 2 — Cryptographic Payload Pre-Hashing:</strong> Payload is hashed with SHA-256 to create an unforgeable integrity seal before encryption.</li>
-              <li><strong>Layer 3 — 2,000,000 Dual-Stage KDF Derivation:</strong> Pre-whitened key material stretched via 2M iterations.</li>
-              <li><strong>Layer 4 — Authenticated Cipher Stream:</strong> AES-256-GCM cipher with 128-bit Galois Authentication Tag (GMAC). Tampering with any bit fails decryption immediately.</li>
-              <li><strong>Layer 5 — Secure Ephemeral Download Stream:</strong> Packaged into self-contained <code>.secure.html</code> files and delivered via ephemeral local Blob URLs with zero server interception.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>🛡️ ZERO NETWORK VULNERABILITY &amp; BURP SUITE INTERCEPTION IMMUNITY</h3>
-            <p><strong>Coralgenz Vault is 100% air-gapped and client-side:</strong></p>
-            <ul>
-              <li><strong>Zero Outbound Requests:</strong> All cryptographic encryption, key derivation, and file decryption execute entirely in local browser WebCrypto memory. Absolutely zero network traffic travels over HTTP/HTTPS.</li>
-              <li><strong>Burp Suite / Proxy Immune:</strong> Network proxies like Burp Suite, Charles, or OWASP ZAP capture zero packets, zero passwords, and zero file data because no network calls exist.</li>
-              <li><strong>Strict Content Security Policy (CSP):</strong> Standalone <code>.secure.html</code> packages enforce <code>connect-src 'none'</code>, <code>form-action 'none'</code>, and <code>base-uri 'none'</code> at the browser engine level, neutralizing data exfiltration.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>🦠 ANTI-VIRUS &amp; VOLATILE MEMORY PURGING</h3>
-            <p>Multi-layered protections defend against spyware, memory inspection, and automated malware:</p>
-            <ul>
-              <li><strong>Volatile Memory Zeroization:</strong> Sensitive byte buffers in RAM are proactively purged and overwritten with zeros (<code>Uint8Array.fill(0)</code>) immediately after derivation or session closure.</li>
-              <li><strong>DOM Password Scrubbing:</strong> Password inputs are cleared from memory immediately upon initiating the cryptographic routine.</li>
-              <li><strong>Anti-Debugger Honeypots:</strong> Active traps detect external debuggers attempting heap inspection and trigger instantaneous memory zeroization.</li>
-              <li><strong>Anti-Cache Headers:</strong> <code>Cache-Control: no-store</code> ensures decrypted media is never cached to disk or swap files.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>📤 STANDALONE PROTECTED HTML PACKAGES</h3>
-            <p>When you protect or export a file, you can download it as a <strong>.secure.html</strong> package. This self-contained digital fortress file includes:</p>
-            <ul>
-              <li>The encrypted payload blob with Galois authentication tag</li>
-              <li>Dual-stage zero-dependency browser decryptor</li>
-              <li>Anti-debugging honeypot traps and inspector blocking</li>
-              <li>No internet connection required for decryption</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>🚨 PANIC EMERGENCY TRIGGER</h3>
-            <p>In high-risk environments, tap the red <strong>PANIC</strong> button in the top navigation bar to immediately lock the screen or scrub sensitive in-memory payloads according to your settings.</p>
-          </section>
+        <!-- Interactive Navigation Tabs -->
+        <div class="help-nav-tabs" role="tablist">
+          <button type="button" class="help-nav-tab active" data-tab="help-tab-steps" role="tab" aria-selected="true">
+            <span class="tab-icon">🚀</span>
+            <span class="tab-label">4-Step Guide</span>
+          </button>
+          <button type="button" class="help-nav-tab" data-tab="help-tab-unlock" role="tab" aria-selected="false">
+            <span class="tab-icon">🔓</span>
+            <span class="tab-label">How to Unlock</span>
+          </button>
+          <button type="button" class="help-nav-tab" data-tab="help-tab-formats" role="tab" aria-selected="false">
+            <span class="tab-icon">📁</span>
+            <span class="tab-label">Supported Files</span>
+          </button>
+          <button type="button" class="help-nav-tab" data-tab="help-tab-faq" role="tab" aria-selected="false">
+            <span class="tab-icon">💡</span>
+            <span class="tab-label">FAQ &amp; Tips</span>
+          </button>
         </div>
-        <div class="modal-actions cyber-modal-actions">
-          <button id="close-help" class="cyber-btn cyber-btn-primary">ACKNOWLEDGED</button>
+
+        <!-- Tab 1: 4-Step Quickstart Guide -->
+        <div id="help-tab-steps" class="help-tab-panel active" role="tabpanel">
+          <div class="guide-steps-flow">
+            
+            <!-- Step 1 -->
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">01</div>
+                <div class="step-icon-wrap">📂</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">Choose or Drop Any File</h3>
+                  <span class="step-badge">DOCUMENT, MEDIA OR ARCHIVE</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                Drag and drop your file into the center drop zone or tap anywhere inside it to select from your phone or computer. Supports Office docs, PDFs, photos, videos, or archives up to 150 MB.
+              </p>
+              <div class="step-tip-callout tip-green">
+                <span class="tip-icon">🔒</span>
+                <span class="tip-text"><strong>100% Private:</strong> Your file never leaves your device and is never uploaded to any server. Everything happens in your browser!</span>
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">02</div>
+                <div class="step-icon-wrap">🔑</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">Set a Strong Password</h3>
+                  <span class="step-badge">HIGH-ENTROPY ENCRYPTION</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                Type your password or tap <strong>"🎲 GENERATE"</strong> for an instant hacker-proof password. Watch the real-time strength bar turn emerald green!
+              </p>
+              <div class="step-tip-callout tip-amber">
+                <span class="tip-icon">⚠️</span>
+                <span class="tip-text"><strong>Important:</strong> Remember or securely save your password. Because of zero-knowledge encryption, no one can recover a forgotten password.</span>
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">03</div>
+                <div class="step-icon-wrap">⚡</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">Encrypt in Seconds</h3>
+                  <span class="step-badge">MILITARY-SPEC AES-256-GCM</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                Tap <strong>"ENCRYPT &amp; PROTECT FILE"</strong>. The high-speed holographic cryptographic engine seals your file with military-grade AES-256 encryption in 1 to 3 seconds.
+              </p>
+              <div class="step-tip-callout tip-cyan">
+                <span class="tip-icon">🛡️</span>
+                <span class="tip-text"><strong>Crack-Proof:</strong> Protected by 2,000,000 PBKDF2 rounds to stop all brute-force attempts and GPU crackers.</span>
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">04</div>
+                <div class="step-icon-wrap">📥</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">Download Your .secure.html File</h3>
+                  <span class="step-badge">SELF-CONTAINED FORTRESS</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                Tap <strong>"DOWNLOAD SECURED FILE"</strong> to save your file as <code>.secure.html</code>. It contains both your encrypted data and its own offline decryptor!
+              </p>
+              <div class="step-tip-callout tip-purple">
+                <span class="tip-icon">✨</span>
+                <span class="tip-text"><strong>Self-Contained:</strong> You can send this file anywhere (Email, WhatsApp, USB) and open it on any device without installing any software.</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Tab 2: How to Unlock & View Files -->
+        <div id="help-tab-unlock" class="help-tab-panel" role="tabpanel">
+          <div class="guide-unlock-intro">
+            <div class="unlock-intro-badge">STANDALONE OFFLINE UNLOCKING</div>
+            <h3 class="unlock-intro-title">How to Open Your Protected Files</h3>
+            <p class="unlock-intro-desc">Any <code>.secure.html</code> file you download from Coralgenz Vault is completely standalone. Here is how to view it:</p>
+          </div>
+
+          <div class="guide-steps-flow">
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">A</div>
+                <div class="step-icon-wrap">🌐</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">Open in Any Browser</h3>
+                  <span class="step-badge">PHONE, TABLET OR LAPTOP</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                Double-click or tap the <code>.secure.html</code> file. It opens instantly in Safari, Chrome, Edge, Firefox, or Samsung Internet. No app installation is required!
+              </p>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">B</div>
+                <div class="step-icon-wrap">🔐</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">Type Your Password</h3>
+                  <span class="step-badge">LOCAL CLIENT DECRYPTION</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                The built-in lock screen will appear. Type the password you created and tap <strong>"UNLOCK VAULT"</strong>. The browser decrypts your file locally in milliseconds.
+              </p>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">C</div>
+                <div class="step-icon-wrap">👁️</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">View Documents &amp; Media Instantly</h3>
+                  <span class="step-badge">BUILT-IN ZERO-LEAK VIEWER</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                Word documents (<code>.docx</code>, <code>.doc</code>), Excel spreadsheets (<code>.xlsx</code>, <code>.xls</code>), PowerPoint presentations (<code>.pptx</code>, <code>.ppt</code>), PDFs, photos, and videos display directly inside the browser with exact formatting. You can also download the original file anytime.
+              </p>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="step-card-header">
+                <div class="step-num-pill">D</div>
+                <div class="step-icon-wrap">✈️</div>
+                <div class="step-title-group">
+                  <h3 class="step-title">100% Offline &amp; Airplane Mode</h3>
+                  <span class="step-badge">ZERO INTERNET REQUIRED</span>
+                </div>
+              </div>
+              <p class="step-desc">
+                You do NOT need Wi-Fi or cellular data to open and view your files. It works on flights, offline locations, and air-gapped confidential computers.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Supported File Formats -->
+        <div id="help-tab-formats" class="help-tab-panel" role="tabpanel">
+          <div class="formats-intro">
+            <h3 class="formats-intro-title">Supported File Formats</h3>
+            <p class="formats-intro-desc">Coralgenz Vault supports virtually every file type up to 150 MB with native in-browser viewers:</p>
+          </div>
+
+          <div class="formats-category-grid">
+            
+            <div class="format-card">
+              <div class="format-card-header">
+                <span class="format-card-icon">📘</span>
+                <span class="format-card-title">Microsoft Office</span>
+              </div>
+              <div class="format-pills">
+                <span class="f-pill cyan">Word (.docx)</span>
+                <span class="f-pill cyan">Word (.doc)</span>
+                <span class="f-pill green">Excel (.xlsx)</span>
+                <span class="f-pill green">Excel (.xls)</span>
+                <span class="f-pill amber">PowerPoint (.pptx)</span>
+                <span class="f-pill amber">PowerPoint (.ppt)</span>
+              </div>
+              <p class="format-note">Interactive sheet viewing, document layout, table rendering, and slide navigation built-in.</p>
+            </div>
+
+            <div class="format-card">
+              <div class="format-card-header">
+                <span class="format-card-icon">📕</span>
+                <span class="format-card-title">PDF &amp; Text</span>
+              </div>
+              <div class="format-pills">
+                <span class="f-pill red">Adobe PDF (.pdf)</span>
+                <span class="f-pill blue">Text (.txt)</span>
+                <span class="f-pill blue">Markdown (.md)</span>
+                <span class="f-pill purple">Rich Text (.rtf)</span>
+                <span class="f-pill cyan">JSON / CSV</span>
+              </div>
+              <p class="format-note">High-resolution PDF viewer, code highlighting, and clean typography.</p>
+            </div>
+
+            <div class="format-card">
+              <div class="format-card-header">
+                <span class="format-card-icon">🖼️</span>
+                <span class="format-card-title">Images &amp; Graphics</span>
+              </div>
+              <div class="format-pills">
+                <span class="f-pill green">PNG</span>
+                <span class="f-pill green">JPEG / JPG</span>
+                <span class="f-pill green">WEBP</span>
+                <span class="f-pill purple">GIF</span>
+                <span class="f-pill cyan">SVG</span>
+                <span class="f-pill blue">BMP / ICO</span>
+              </div>
+              <p class="format-note">Decrypted directly into memory with zero disk cache exposure.</p>
+            </div>
+
+            <div class="format-card">
+              <div class="format-card-header">
+                <span class="format-card-icon">🎬</span>
+                <span class="format-card-title">Audio &amp; Video</span>
+              </div>
+              <div class="format-pills">
+                <span class="f-pill purple">MP4 Video</span>
+                <span class="f-pill purple">WebM</span>
+                <span class="f-pill purple">MOV</span>
+                <span class="f-pill cyan">MP3 Audio</span>
+                <span class="f-pill cyan">WAV</span>
+                <span class="f-pill cyan">AAC / OGG</span>
+              </div>
+              <p class="format-note">In-browser media player with progress seek and volume controls.</p>
+            </div>
+
+            <div class="format-card">
+              <div class="format-card-header">
+                <span class="format-card-icon">📦</span>
+                <span class="format-card-title">Archives &amp; All Other Files</span>
+              </div>
+              <div class="format-pills">
+                <span class="f-pill amber">ZIP</span>
+                <span class="f-pill amber">RAR</span>
+                <span class="f-pill amber">7Z / TAR</span>
+                <span class="f-pill cyan">Source Code</span>
+                <span class="f-pill green">Any Binary Format</span>
+              </div>
+              <p class="format-note">Any file up to 150 MB can be encrypted, protected, and restored with 100% binary fidelity.</p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Tab 4: FAQ & Pro-Tips -->
+        <div id="help-tab-faq" class="help-tab-panel" role="tabpanel">
+          <div class="faq-list">
+
+            <div class="faq-card">
+              <div class="faq-question">
+                <span class="faq-q-badge">Q</span>
+                <h4>Can I send a protected file over WhatsApp, Email, or Google Drive?</h4>
+              </div>
+              <div class="faq-answer">
+                <p><strong>Yes, absolutely!</strong> The downloaded <code>.secure.html</code> file is a standard file. You can attach it to emails, share it via WhatsApp, Telegram, USB drives, or Cloud storage. The recipient only needs any modern browser and your password.</p>
+              </div>
+            </div>
+
+            <div class="faq-card">
+              <div class="faq-question">
+                <span class="faq-q-badge">Q</span>
+                <h4>Does Coralgenz or any server have access to my password or files?</h4>
+              </div>
+              <div class="faq-answer">
+                <p><strong>Never.</strong> Coralgenz Vault operates under a strict Zero-Knowledge and Air-Gapped architecture. All encryption and decryption occur solely in your browser's private memory. No servers, no tracking, and zero network traffic.</p>
+              </div>
+            </div>
+
+            <div class="faq-card">
+              <div class="faq-question">
+                <span class="faq-q-badge">Q</span>
+                <h4>What happens if I lose or forget my password?</h4>
+              </div>
+              <div class="faq-answer">
+                <p>Because there are no backdoors and no central database, <strong>no one (including Coralgenz) can recover your password or decrypt the file without it</strong>. Always store your passwords in a password manager or secure location.</p>
+              </div>
+            </div>
+
+            <div class="faq-card">
+              <div class="faq-question">
+                <span class="faq-q-badge">Q</span>
+                <h4>What is the red PANIC button in the top navigation?</h4>
+              </div>
+              <div class="faq-answer">
+                <p>The <strong>PANIC</strong> button is an emergency camouflage and security lock. If someone approaches your screen unexpectedly, tap it to instantly lock the vault or switch to an innocent screen disguise.</p>
+              </div>
+            </div>
+
+            <div class="faq-card">
+              <div class="faq-question">
+                <span class="faq-q-badge">Q</span>
+                <h4>What if I accidentally drop a .secure.html file back into this app?</h4>
+              </div>
+              <div class="faq-answer">
+                <p>Coralgenz Vault automatically detects files that are already secured. Instead of re-encrypting it, it prevents duplicate locking and advises you to open and unlock it.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="modal-actions cyber-modal-actions help-sticky-footer">
+          <button type="button" id="close-help" class="cyber-btn cyber-btn-primary cyber-btn-lg" style="width:100%">
+            <span>GOT IT, LET'S SECURE FILES</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </button>
         </div>
       </div>
     </dialog>

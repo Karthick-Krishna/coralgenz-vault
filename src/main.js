@@ -466,9 +466,28 @@ function setupEventListeners() {
   // Keyboard Shortcuts
   setupKeyboardShortcuts();
 
-  // Help Modal
+  // Help Modal & User Guide
   helpBtn?.addEventListener('click', () => helpModal?.showModal());
   document.getElementById('close-help')?.addEventListener('click', () => helpModal?.close());
+  document.getElementById('close-help-x')?.addEventListener('click', () => helpModal?.close());
+
+  // Help Modal Interactive Tab Switcher
+  const helpTabs = document.querySelectorAll('.help-nav-tab');
+  helpTabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = tab.getAttribute('data-tab');
+      helpTabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      document.querySelectorAll('.help-tab-panel').forEach(panel => {
+        panel.classList.toggle('active', panel.id === targetId);
+      });
+    });
+  });
 
   // Click outside modal to close (backdrop click)
   setupModalBackdropClose();
