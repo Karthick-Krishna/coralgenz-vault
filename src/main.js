@@ -5242,7 +5242,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
         }, true);
 
         // Trap DevTools Shortcuts (F12, Ctrl+Shift+I, Cmd+Option+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S) & Print (Ctrl+P / Cmd+P)
-        window.addEventListener('keydown', (e) => {
+        function blockKeyShortcuts(e) {
             if (e.key === 'F12' || e.keyCode === 123) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -5250,7 +5250,8 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
             }
             if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey)) {
                 const k = (e.key || '').toLowerCase();
-                if (k === 'i' || k === 'j' || k === 'c' || k === 'k') {
+                const code = e.keyCode;
+                if (k === 'i' || k === 'j' || k === 'c' || k === 'k' || code === 73 || code === 74 || code === 67 || code === 75) {
                     e.preventDefault();
                     e.stopPropagation();
                     return false;
@@ -5258,13 +5259,27 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
             }
             if (e.ctrlKey || e.metaKey) {
                 const k = (e.key || '').toLowerCase();
-                if (k === 'u' || k === 's' || k === 'p') {
+                const code = e.keyCode;
+                if (k === 'u' || k === 's' || k === 'p' || code === 85 || code === 83 || code === 80) {
                     e.preventDefault();
                     e.stopPropagation();
                     return false;
                 }
             }
-        }, true);
+        }
+        window.addEventListener('keydown', blockKeyShortcuts, true);
+        document.addEventListener('keydown', blockKeyShortcuts, true);
+
+        ['copy', 'cut', 'paste', 'selectstart', 'dragstart'].forEach(function(evt) {
+            document.addEventListener(evt, function(e) {
+                if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea')) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }, true);
+        });
 
         window.addEventListener('keyup', (e) => {
             if (e.key === 'PrintScreen' || e.keyCode === 44) {

@@ -165,7 +165,7 @@
       }, true);
 
       // 3. Intercept DevTools & Source View Keyboard Shortcuts
-      window.addEventListener('keydown', function(e) {
+      function blockKeyShortcuts(e) {
         // F12
         if (e.key === 'F12' || e.keyCode === 123) {
           e.preventDefault();
@@ -178,27 +178,48 @@
         // Ctrl+Shift+K (Firefox console)
         if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey)) {
           const k = (e.key || '').toLowerCase();
-          if (k === 'i' || k === 'j' || k === 'c' || k === 'k') {
+          const code = e.keyCode;
+          if (k === 'i' || k === 'j' || k === 'c' || k === 'k' || code === 73 || code === 74 || code === 67 || code === 75) {
             e.preventDefault();
             e.stopPropagation();
             return false;
           }
         }
         // Ctrl+U / Cmd+Option+U (View Page Source)
-        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 'u')) {
+        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 'u' || e.keyCode === 85)) {
           e.preventDefault();
           e.stopPropagation();
           return false;
         }
         // Ctrl+S / Cmd+S (Save Page)
-        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 's')) {
+        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 's' || e.keyCode === 83)) {
           e.preventDefault();
           e.stopPropagation();
           return false;
         }
-      }, true);
+        // Ctrl+P / Cmd+P (Print)
+        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 'p' || e.keyCode === 80)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }
+      window.addEventListener('keydown', blockKeyShortcuts, true);
+      document.addEventListener('keydown', blockKeyShortcuts, true);
 
-      // 4. Active DevTools Detection & Security Lockdown Shield
+      // 4. Prevent Copy, Paste, Cut, Selection, and Drag
+      ['copy', 'cut', 'paste', 'selectstart', 'dragstart'].forEach(function(evt) {
+        document.addEventListener(evt, function(e) {
+          if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea')) {
+            return; // Allow in inputs
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+      });
+
+      // 5. Active DevTools Detection & Security Lockdown Shield
       let isShieldActive = false;
       function engageSecurityShield() {
         if (isShieldActive) return;

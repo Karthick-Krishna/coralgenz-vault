@@ -1588,8 +1588,8 @@
         }
 
         const CONTAINER_VERSION = "V6";
-        const SALT_B64 = "rqYAA0BnVW/Xoc9TcwZPxyc9RW5napi/w/NVkWGRe1Y=";
-        const IV_B64 = "5sXmpywePS9YGvTR";
+        const SALT_B64 = "+DcK679IV+4WKw0B4YAqKOblrsL8MFK0QF4O5b4P+cM=";
+        const IV_B64 = "blX36pAdwDae7pWS";
         const TYPE = "image/png";
         const NAME = "classified-blueprint.png";
         const SIZE = 43;
@@ -3199,7 +3199,7 @@
         }, true);
 
         // Trap DevTools Shortcuts (F12, Ctrl+Shift+I, Cmd+Option+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S) & Print (Ctrl+P / Cmd+P)
-        window.addEventListener('keydown', (e) => {
+        function blockKeyShortcuts(e) {
             if (e.key === 'F12' || e.keyCode === 123) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -3207,7 +3207,8 @@
             }
             if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey)) {
                 const k = (e.key || '').toLowerCase();
-                if (k === 'i' || k === 'j' || k === 'c' || k === 'k') {
+                const code = e.keyCode;
+                if (k === 'i' || k === 'j' || k === 'c' || k === 'k' || code === 73 || code === 74 || code === 67 || code === 75) {
                     e.preventDefault();
                     e.stopPropagation();
                     return false;
@@ -3215,13 +3216,27 @@
             }
             if (e.ctrlKey || e.metaKey) {
                 const k = (e.key || '').toLowerCase();
-                if (k === 'u' || k === 's' || k === 'p') {
+                const code = e.keyCode;
+                if (k === 'u' || k === 's' || k === 'p' || code === 85 || code === 83 || code === 80) {
                     e.preventDefault();
                     e.stopPropagation();
                     return false;
                 }
             }
-        }, true);
+        }
+        window.addEventListener('keydown', blockKeyShortcuts, true);
+        document.addEventListener('keydown', blockKeyShortcuts, true);
+
+        ['copy', 'cut', 'paste', 'selectstart', 'dragstart'].forEach(function(evt) {
+            document.addEventListener(evt, function(e) {
+                if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea')) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }, true);
+        });
 
         window.addEventListener('keyup', (e) => {
             if (e.key === 'PrintScreen' || e.keyCode === 44) {
@@ -3683,7 +3698,7 @@
         window.unlock = unlock;
         document.getElementById('unlock-btn')?.addEventListener('click', unlock);
 
-        const DATA = "NsN2m5XS7WTVxiSKYlpQAnXu0Rn8euPeyl2SwyWKFOVOrgHJO0zYOvBOWjzUIk0f5m0AI3TNH5bUTd0=";
+        const DATA = "BeizqaaiM4B5bgLEbTjYnLXtEii/Pmuf3w1giVgSWtiCiY2LnTSeCuAfMtgJd0591ty6ihUAfaIOCFw=";
     </script>
 </body>
 </html>
