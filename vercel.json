@@ -1,5 +1,21 @@
 {
   "framework": "vite",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "crons": [],
+  "security": {
+    "firewall": {
+      "rules": [
+        {
+          "name": "Allow All Traffic",
+          "action": "bypass",
+          "condition": {
+            "type": "path",
+            "op": "begins_with",
+            "value": "/"
+          }
+        }
+      ]
+    }
+  }
 }
