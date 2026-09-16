@@ -11,7 +11,7 @@
     <meta name="referrer" content="no-referrer">
     <!-- Military-Grade Content Security Policy: Blocks all unauthorized external network exfiltration & Burp Suite Proxy Interception -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; frame-src blob:; script-src 'unsafe-inline' 'unsafe-eval' blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none';">
-    <title>Coralgenz Vault // classified-blueprint.png</title>
+    <title>Coralgenz Vault // secret-document.pdf</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1654,7 +1654,7 @@
                 </svg>
             </div>
             <div class="file-chip-details">
-                <div class="file-chip-name" title="classified-blueprint.png">classified-blueprint.png</div>
+                <div class="file-chip-name" title="secret-document.pdf">secret-document.pdf</div>
                 <div class="file-chip-meta" id="file-size-display">PROTECTED PAYLOAD</div>
             </div>
         </div>
@@ -1696,7 +1696,7 @@
         <div class="viewer-header">
             <div class="viewer-brand">
                 <div class="viewer-brand-title">Coralgenz Vault</div>
-                <div class="viewer-file-badge" id="viewer-file-name">classified-blueprint.png</div>
+                <div class="viewer-file-badge" id="viewer-file-name">secret-document.pdf</div>
             </div>
             <div class="viewer-actions">
                 <button type="button" id="header-dl-btn" class="viewer-btn-dl" style="display:none;">
@@ -1728,13 +1728,13 @@
         }
 
         const CONTAINER_VERSION = "V9";
-        const SALT_B64 = "23alfVseaONuSO5+6XRRDpuCXRrQ4NDGwMEYQ96iwIw=";
-        const IV_B64 = "as/FaMkIGw1+EBdp";
-        const TYPE = "image/png";
-        const NAME = "classified-blueprint.png";
-        const SIZE = 43;
+        const SALT_B64 = "HOcj14gqiiVRVZn9+cFQ0B12ZQqj5o1GolwzMvjEa1k=";
+        const IV_B64 = "L+9bF46oH44ZHWQ3";
+        const TYPE = "application/pdf";
+        const NAME = "secret-document.pdf";
+        const SIZE = 56;
         const BRAND = "Coralgenz Vault";
-            const INTEGRITY_HASH = "63a535b5dc28e53b44fd8fd690eb1fa46a3ed5124c5a76dc8d307bd92eac9f3d";
+            const INTEGRITY_HASH = "ba26f5d08e3a3e0450133be4b464bc1192db2bbc296f5125ebfe28211c792d85";
 
         // Constant military-grade Galois AAD format binding token
         const MANDATORY_SECURE_FORMAT_AAD = 'CORALGENZ::FORMAT::STANDARD::SECURE::MANDATORY::V9::VALIDATED_EXT=.secure.html';
@@ -1805,8 +1805,8 @@
         const MILSPEC_PEPPER_V4 = ["CORALGENZ", "MILSPEC_V4", "ANTI_JOHN_THE_RIPPER", "ZERO_KNOWLEDGE", "992174829104"].join("::");
 
         // Persistent dual-storage military-grade brute-force lockout tracking per container
-        const ATTEMPTS_KEY = 'cg_fails_' + "test-file-uuid-001";
-        const LOCKOUT_KEY = 'cg_lockout_' + "test-file-uuid-001";
+        const ATTEMPTS_KEY = 'cg_fails_' + "test-uuid-weak-x";
+        const LOCKOUT_KEY = 'cg_lockout_' + "test-uuid-weak-x";
         let inMemoryFails = 0;
         let inMemoryLockoutUntil = 0;
 
@@ -4432,7 +4432,7 @@
         window.unlock = unlock;
         document.getElementById('unlock-btn')?.addEventListener('click', unlock);
 
-        const DATA = "af0Is+qnFDmhJ9NW+EnryI0BsVdMe+9wrgXVcYtIfay/sFEuqamd4UoaFNU6v2htjDIrVQzaJ3LSJVs=";
+        const DATA = "4u9Bo6Yi/YDkfpUyQhGHgVBwsAn/kv87kNevfjGdoArqKerHexeogTVjc1MwUSbRdumNQG+O8MqqUWpkIe/MZp169Q5b4Jj8";
     </script>
 </body>
 </html>

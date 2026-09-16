@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<script type="module">
+import { SecureCrypto, MILSPEC_ANTI_CRACKER_PEPPER_V9 } from './src/crypto.js';
+
+async function run() {
+    const pwd = "test";
+    const salt = SecureCrypto.generateSalt();
+    
+    // 1. Worker
+    const key1 = await SecureCrypto.deriveKeyAsyncWorker(pwd, salt, 2000000, MILSPEC_ANTI_CRACKER_PEPPER_V9);
+    const raw1 = await crypto.subtle.exportKey('raw', key1);
+    const hex1 = Array.from(new Uint8Array(raw1)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    
+    // 2. Sync
+    const key2 = await SecureCrypto.deriveKey12Stage(pwd, salt, 2000000, MILSPEC_ANTI_CRACKER_PEPPER_V9);
+    const raw2 = await crypto.subtle.exportKey('raw', key2);
+    const hex2 = Array.from(new Uint8Array(raw2)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    
+    console.log(hex1 === hex2 ? "MATCH" : "MISMATCH");
+    console.log("Worker:", hex1);
+    console.log("Sync:  ", hex2);
+}
+run();
+</script>
+</body>
+</html>
