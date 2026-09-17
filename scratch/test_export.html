@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<style>
+/* Reset and Base */
+:root {
+    --bg-base: #f8fafc;
+    --text-main: #0f172a;
+    --border-color: #e2e8f0;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: system-ui;
+    background: var(--bg-base);
+    color: var(--text-main);
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+.doc-viewer-container {
+    width: 100%;
+    max-width: 1200px;
+    height: 500px;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+}
+.excel-tabs-bar {
+    display: flex;
+    gap: 4px;
+    padding: 6px 16px 0;
+    background: #f1f5f9;
+    border-bottom: 1px solid var(--border-color);
+}
+.excel-tab-btn {
+    padding: 8px 16px;
+    background: #fff;
+    border: none;
+    border-bottom: 2px solid #059669;
+}
+.excel-table-scroll {
+    flex: 1;
+    overflow: auto;
+}
+.excel-grid-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+.excel-grid-table th, .excel-grid-table td {
+    border: 1px solid #e2e8f0;
+    padding: 7px 11px;
+}
+.excel-grid-table thead th {
+    background: #f8fafc;
+}
+</style>
+</head>
+<body>
+<div class="doc-viewer-container">
+    <div class="excel-tabs-bar">
+        <button class="excel-tab-btn active">Sheet 1</button>
+    </div>
+    <div class="excel-table-scroll">
+        <table class="excel-grid-table">
+            <thead>
+                <tr><th>#</th><th>A</th><th>B</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>1</td><td>Hello</td><td>World</td></tr>
+                <tr><td>2</td><td>123</td><td>456</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

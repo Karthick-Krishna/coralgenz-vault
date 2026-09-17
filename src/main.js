@@ -821,71 +821,300 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// --- Feature: Excel Rendering ---
-function renderExcelToHTML(arrayBuffer, container) {
-  try {
-    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-    const sheetNames = workbook.SheetNames;
-    if (sheetNames.length === 0) return;
+function escapeHtmlApp(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
+// --- Feature: Excel Rendering (High-Fidelity Grid, Sheet Tabs & Search) ---
+function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet.xlsx') {
+  try {
+    let sheets = [];
+    const bytes = new Uint8Array(arrayBuffer);
+
+    // 1. Try SheetJS if available in app runtime
+    if (typeof XLSX !== 'undefined' && XLSX.read) {
+      try {
+        const workbook = XLSX.read(bytes, { type: 'array' });
+        const sheetNames = workbook.SheetNames || [];
+        sheetNames.forEach(sName => {
+          const ws = workbook.Sheets[sName];
+          if (ws) {
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            sheets.push({ name: sName, rows: rows });
+          }
+        });
+      } catch (e) {
+        console.warn('XLSX library read fallback:', e);
+      }
+    }
+
+    // 2. Pure-JS OpenXML (.xlsx) fallback
+    if (sheets.length === 0 && typeof fflate !== 'undefined' && fflate.unzipSync) {
+      try {
+        const isZip = bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4B;
+        if (isZip) {
+          const files = fflate.unzipSync(bytes);
+          const sharedStrings = [];
+          const ssFile = files['xl/sharedStrings.xml'] || files['xl/SharedStrings.xml'];
+          if (ssFile) {
+            const ssXml = new TextDecoder('utf-8', { fatal: false }).decode(ssFile);
+            const siMatches = ssXml.matchAll(/<si\b[^>]*>(.*?)<\/si>/gs);
+            for (const si of siMatches) {
+              const tMatches = si[1].matchAll(/<t\b[^>]*>(.*?)<\/t>/gs);
+              let sText = '';
+              for (const tm of tMatches) sText += tm[1];
+              sharedStrings.push(escapeHtmlApp(sText));
+            }
+          }
+
+          const wbFile = files['xl/workbook.xml'] || files['xl/Workbook.xml'];
+          const sheetList = [];
+          if (wbFile) {
+            const wbXml = new TextDecoder('utf-8', { fatal: false }).decode(wbFile);
+            const sheetMatches = wbXml.matchAll(/<sheet\b[^>]*name="([^"]+)"[^>]*sheetId="(\d+)"/g);
+            for (const sm of sheetMatches) sheetList.push({ name: sm[1], id: sm[2] });
+          }
+          if (sheetList.length === 0) sheetList.push({ name: 'Sheet 1', id: '1' });
+
+          sheetList.forEach((sm, smIdx) => {
+            const possiblePaths = ['xl/worksheets/sheet' + sm.id + '.xml', 'xl/worksheets/sheet' + (smIdx + 1) + '.xml'];
+            let sheetFile = null;
+            for (const p of possiblePaths) { if (files[p]) { sheetFile = files[p]; break; } }
+            if (sheetFile) {
+              const sheetXml = new TextDecoder('utf-8', { fatal: false }).decode(sheetFile);
+              const rowMatches = sheetXml.matchAll(/<row\b[^>]*>(.*?)<\/row>/gs);
+              const sheetRows = [];
+              for (const rm of rowMatches) {
+                const cellMatches = rm[1].matchAll(/<c\b[^>]*(?:r="([A-Z0-9]+)")?(?:[^>]*t="([^"]*)")?[^>]*>(?:<v>(.*?)<\/v>|<is><t>(.*?)<\/t><\/is>)?/gs);
+                const rowData = [];
+                let maxCol = 0;
+                for (const cm of cellMatches) {
+                  const rAttr = cm[1] || '';
+                  const tAttr = cm[2] || '';
+                  let val = cm[3] !== undefined ? cm[3] : (cm[4] !== undefined ? cm[4] : '');
+                  if (tAttr === 's') val = sharedStrings[parseInt(val, 10)] || '';
+                  let colIdx = 0;
+                  if (rAttr) {
+                    const colLetters = rAttr.replace(/[0-9]/g, '').toUpperCase();
+                    for (let k = 0; k < colLetters.length; k++) colIdx = colIdx * 26 + (colLetters.charCodeAt(k) - 64);
+                    colIdx = colIdx > 0 ? colIdx - 1 : 0;
+                  }
+                  rowData[colIdx] = val;
+                  if (colIdx > maxCol) maxCol = colIdx;
+                }
+                const normalized = [];
+                for (let k = 0; k <= maxCol; k++) normalized.push(rowData[k] !== undefined ? rowData[k] : '');
+                if (normalized.some(c => String(c).trim().length > 0)) sheetRows.push(normalized);
+              }
+              if (sheetRows.length > 0) sheets.push({ name: sm.name, rows: sheetRows });
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('OpenXML in-app parse fallback:', e);
+      }
+    }
+
+    if (sheets.length === 0 || (sheets.length === 1 && sheets[0].rows.length === 0)) {
+      sheets = [{ name: 'Sheet 1', rows: [['(Empty spreadsheet or format preview unavailable)']] }];
+    }
+
+    container.innerHTML = '';
     const viewer = document.createElement('div');
     viewer.className = 'excel-viewer';
 
-    const header = document.createElement('div');
-    header.className = 'excel-header';
+    let activeSheetIdx = 0;
+    let searchQuery = '';
+    let currentZoom = 100;
 
-    const body = document.createElement('div');
-    body.className = 'excel-table-wrapper';
+    const renderUI = () => {
+      viewer.innerHTML = '';
+      const currentSheet = sheets[activeSheetIdx] || { rows: [] };
+      const rows = currentSheet.rows || [];
+      let maxCols = 0;
+      rows.forEach(r => { if (r && r.length > maxCols) maxCols = r.length; });
 
-    let activeSheet = sheetNames[0];
+      // 1. Toolbar
+      const toolbar = document.createElement('div');
+      toolbar.className = 'excel-toolbar';
 
-    const renderSheet = (name) => {
-      body.innerHTML = '';
-      const sheet = workbook.Sheets[name];
-      const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const toolLeft = document.createElement('div');
+      toolLeft.className = 'excel-toolbar-left';
+      toolLeft.innerHTML = `
+        <span class="excel-format-pill">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+          EXCEL SPREADSHEET
+        </span>
+        <span style="font-size:13px;font-weight:600;color:var(--text-main);">${escapeHtmlApp(customFileName)}</span>
+        <span class="excel-stats-pill">${rows.length} Rows &times; ${maxCols} Cols</span>
+      `;
 
-      if (!data || data.length === 0) {
-        body.innerHTML = '<div style="padding:20px;text-align:center;">Empty Sheet</div>';
-        return;
+      const toolRight = document.createElement('div');
+      toolRight.className = 'excel-toolbar-right';
+
+      // Search Box
+      const searchBox = document.createElement('div');
+      searchBox.className = 'doc-search-box';
+      searchBox.innerHTML = '<svg class="doc-search-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+      const searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.className = 'excel-search-input';
+      searchInput.placeholder = 'Search cells...';
+      searchInput.value = searchQuery;
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.toLowerCase();
+        renderTable();
+      });
+      searchBox.appendChild(searchInput);
+      toolRight.appendChild(searchBox);
+
+      // Zoom Controls
+      const zoomControls = document.createElement('div');
+      zoomControls.className = 'doc-zoom-controls';
+      zoomControls.innerHTML = `
+        <button type="button" class="doc-zoom-btn" id="inapp-zoom-out">&minus;</button>
+        <span class="doc-zoom-label" id="inapp-zoom-label">${currentZoom}%</span>
+        <button type="button" class="doc-zoom-btn" id="inapp-zoom-in">&plus;</button>
+      `;
+      toolRight.appendChild(zoomControls);
+
+      toolbar.appendChild(toolLeft);
+      toolbar.appendChild(toolRight);
+      viewer.appendChild(toolbar);
+
+      // Zoom Button Listeners
+      zoomControls.querySelector('#inapp-zoom-out').onclick = () => {
+        if (currentZoom > 60) {
+          currentZoom -= 15;
+          applyZoom();
+        }
+      };
+      zoomControls.querySelector('#inapp-zoom-in').onclick = () => {
+        if (currentZoom < 180) {
+          currentZoom += 15;
+          applyZoom();
+        }
+      };
+
+      // 2. Sheet Tabs
+      if (sheets.length > 1) {
+        const header = document.createElement('div');
+        header.className = 'excel-header';
+        sheets.forEach((sh, idx) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `excel-sheet-btn ${idx === activeSheetIdx ? 'active' : ''}`;
+          btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ${escapeHtmlApp(sh.name)} <span style="opacity:0.7;font-size:10px;">(${sh.rows ? sh.rows.length : 0})</span>`;
+          btn.onclick = () => {
+            activeSheetIdx = idx;
+            searchQuery = '';
+            renderUI();
+          };
+          header.appendChild(btn);
+        });
+        viewer.appendChild(header);
       }
 
-      const table = document.createElement('table');
-      table.className = 'excel-table';
+      // 3. Table Wrapper
+      const tableWrapper = document.createElement('div');
+      tableWrapper.className = 'excel-table-wrapper';
+      viewer.appendChild(tableWrapper);
 
-      data.forEach((row, rowIndex) => {
-        const tr = document.createElement('tr');
-        row.forEach((cell) => {
-          const el = rowIndex === 0 ? 'th' : 'td';
-          const cellEl = document.createElement(el);
-          cellEl.textContent = cell !== undefined ? cell : '';
-          tr.appendChild(cellEl);
+      function applyZoom() {
+        const label = zoomControls.querySelector('#inapp-zoom-label');
+        if (label) label.textContent = currentZoom + '%';
+        const tbl = tableWrapper.querySelector('table');
+        if (tbl) {
+          tbl.style.zoom = currentZoom / 100;
+        }
+      }
+
+      function renderTable() {
+        tableWrapper.innerHTML = '';
+        let filtered = currentSheet.rows || [];
+        if (searchQuery.trim().length > 0) {
+          filtered = filtered.filter(r => (r || []).some(c => String(c).toLowerCase().includes(searchQuery)));
+        }
+
+        if (filtered.length === 0) {
+          tableWrapper.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#94a3b8;font-size:14px;font-family:var(--font-mono);">No matching rows found in this sheet.</div>';
+          return;
+        }
+
+        let curMaxCols = 0;
+        filtered.forEach(r => { if (r && r.length > curMaxCols) curMaxCols = r.length; });
+        if (curMaxCols === 0) curMaxCols = 1;
+
+        const table = document.createElement('table');
+        table.className = 'excel-table';
+        if (currentZoom !== 100) table.style.zoom = currentZoom / 100;
+
+        const thead = document.createElement('thead');
+        const hdrTr = document.createElement('tr');
+        const cornerTh = document.createElement('th');
+        cornerTh.className = 'row-index-hdr';
+        cornerTh.textContent = '#';
+        hdrTr.appendChild(cornerTh);
+
+        for (let c = 0; c < curMaxCols; c++) {
+          const th = document.createElement('th');
+          let colName = '';
+          let temp = c;
+          while (temp >= 0) {
+            colName = String.fromCharCode(65 + (temp % 26)) + colName;
+            temp = Math.floor(temp / 26) - 1;
+          }
+          th.textContent = colName;
+          hdrTr.appendChild(th);
+        }
+        thead.appendChild(hdrTr);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        filtered.forEach((row, rIdx) => {
+          const tr = document.createElement('tr');
+          const rowNumTd = document.createElement('td');
+          rowNumTd.className = 'row-num';
+          rowNumTd.textContent = (rIdx + 1);
+          tr.appendChild(rowNumTd);
+
+          for (let c = 0; c < curMaxCols; c++) {
+            const td = document.createElement('td');
+            const rawVal = row && row[c] !== undefined ? row[c] : '';
+            const strVal = String(rawVal);
+            td.textContent = strVal;
+
+            if (typeof rawVal === 'number' || (!isNaN(rawVal) && strVal.trim() !== '')) {
+              td.style.textAlign = 'right';
+              td.style.fontVariantNumeric = 'tabular-nums';
+            }
+
+            if (searchQuery && strVal.toLowerCase().includes(searchQuery)) {
+              td.classList.add('excel-search-match');
+            }
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
         });
-        table.appendChild(tr);
-      });
-      body.appendChild(table);
+        table.appendChild(tbody);
+        tableWrapper.appendChild(table);
+      }
+
+      renderTable();
     };
 
-    sheetNames.forEach(name => {
-      const btn = document.createElement('button');
-      btn.className = `excel-sheet-btn ${name === activeSheet ? 'active' : ''}`;
-      btn.textContent = name;
-      btn.onclick = () => {
-        activeSheet = name;
-        renderSheet(name);
-        header.querySelectorAll('.excel-sheet-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      };
-      header.appendChild(btn);
-    });
-
-    renderSheet(activeSheet);
-    viewer.appendChild(header);
-    viewer.appendChild(body);
+    renderUI();
     container.appendChild(viewer);
 
   } catch (err) {
-    console.error(err);
-    container.innerHTML = `<div style="padding:20px;color:red;">Error parsing Excel file: ${err.message}</div>`;
+    console.error('renderExcelToHTML error:', err);
+    container.innerHTML = `<div style="padding:20px;color:red;">Error parsing Excel file: ${escapeHtmlApp(err.message)}</div>`;
   }
 }
 
@@ -2747,15 +2976,15 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
         /* Multi-Format In-Browser Document Viewers */
         .doc-viewer-container {
             width: 100%;
-            max-width: 1200px;
-            height: calc(100vh - 120px);
-            min-height: 520px;
+            max-width: 96vw;
+            height: calc(100vh - 70px);
+            min-height: 540px;
             display: flex;
             flex-direction: column;
             background: #ffffff;
             border-radius: 14px;
             overflow: hidden;
-            box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 10px 40px rgba(15, 23, 42, 0.12);
             border: 1px solid var(--border-color);
         }
         .doc-toolbar {
@@ -2901,7 +3130,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
         .excel-tabs-bar {
             display: flex;
             gap: 4px;
-            padding: 6px 16px 0;
+            padding: 8px 16px 0;
             background: #f1f5f9;
             border-bottom: 1px solid var(--border-color);
             overflow-x: auto;
@@ -2910,9 +3139,9 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
             padding: 8px 16px;
             font-size: 12px;
             font-weight: 600;
-            background: transparent;
-            border: none;
-            border-bottom: 2px solid transparent;
+            background: #e2e8f0;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
             color: var(--text-muted);
             cursor: pointer;
             transition: all 0.15s;
@@ -2920,16 +3149,17 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            border-radius: 6px 6px 0 0;
         }
         .excel-tab-btn:hover {
             color: var(--text-main);
-            background: rgba(255, 255, 255, 0.5);
+            background: #ffffff;
         }
         .excel-tab-btn.active {
             color: #059669;
             background: #ffffff;
-            border-bottom-color: #059669;
-            border-radius: 6px 6px 0 0;
+            border-color: var(--border-color);
+            border-bottom: 2px solid #059669;
             font-weight: 700;
         }
         .excel-tab-count {
@@ -2944,62 +3174,83 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
             background: #ffffff;
         }
         .excel-grid-table {
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-family: var(--font-mono);
             font-size: 12px;
-            width: 100%;
-            min-width: 600px;
+            width: max-content;
+            min-width: 100%;
             color: #0f172a;
         }
         .excel-grid-table th, .excel-grid-table td {
-            border: 1px solid #e2e8f0;
-            padding: 7px 11px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 6px 12px;
             white-space: nowrap;
             text-align: left;
+            font-variant-numeric: tabular-nums;
         }
         .excel-grid-table thead th {
             position: sticky;
             top: 0;
-            background: #f8fafc;
+            background: #f1f5f9;
             color: #475569;
             font-weight: 700;
             font-size: 11px;
             letter-spacing: 0.05em;
-            z-index: 2;
-            box-shadow: 0 1px 0 #e2e8f0;
+            z-index: 10;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             text-align: center;
+            min-width: 80px;
+            border-top: 1px solid #cbd5e1;
+            border-bottom: 2px solid #cbd5e1;
         }
         .excel-grid-table thead th.row-index-hdr {
-            width: 44px;
-            min-width: 44px;
+            width: 48px;
+            min-width: 48px;
+            max-width: 48px;
             text-align: center;
-            background: #f1f5f9;
-            color: #64748b;
+            background: #e2e8f0;
+            color: #475569;
             left: 0;
-            z-index: 3;
+            top: 0;
+            z-index: 20;
+            position: sticky;
+            font-weight: 700;
+            border-left: 1px solid #cbd5e1;
+            border-right: 2px solid #cbd5e1;
         }
         .excel-grid-table tbody td.row-num {
             position: sticky;
             left: 0;
             background: #f8fafc;
-            color: #94a3b8;
+            color: #64748b;
             text-align: center;
             font-weight: 600;
             user-select: none;
-            z-index: 1;
-            width: 44px;
+            z-index: 5;
+            width: 48px;
+            min-width: 48px;
+            max-width: 48px;
+            border-left: 1px solid #e2e8f0;
+            border-right: 2px solid #cbd5e1;
         }
-        .excel-grid-table tbody tr:hover td {
-            background: #f0fdf4;
+        .excel-grid-table tbody tr:nth-child(even) td:not(.row-num) {
+            background: #fbfcfe;
+        }
+        .excel-grid-table tbody tr:hover td:not(.row-num) {
+            background: #f0fdf4 !important;
         }
         .excel-grid-table tbody tr:hover td.row-num {
-            background: #dcfce7;
-            color: #166534;
+            background: #dcfce7 !important;
+            color: #166534 !important;
+            font-weight: 700;
         }
         .excel-search-match {
             background: #fef08a !important;
             font-weight: 700 !important;
             color: #854d0e !important;
+            outline: 1px solid #eab308;
         }
         .excel-empty-state {
             padding: 60px 20px;
@@ -4176,225 +4427,443 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                 .replace(/'/g, '&#39;');
         }
 
-        function renderExcelSpreadsheet(bytes, name, container, allowDl, dlBlob) {
-            container.innerHTML = '';
-            const wrapper = document.createElement('div');
-            wrapper.className = 'doc-viewer-container';
-
-            let sheets = [];
-
-            // 1. Try embedded XLSX engine (SheetJS: supports xlsx, xls, csv, tsv, ods, formulas, formatting)
-            try {
-                let xlsxEngine = window.XLSX;
-                if (!xlsxEngine && typeof XLSX_DEFLATED !== 'undefined' && XLSX_DEFLATED) {
-                    xlsxEngine = loadEmbeddedLibrary(XLSX_DEFLATED, 'XLSX');
-                    if (xlsxEngine) window.XLSX = xlsxEngine;
+        const SpreadsheetParser = {
+            parse: function(bytes, filename) {
+                var u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+                var lowerName = (filename || '').toLowerCase();
+                
+                // 1. Check if ZIP (XLSX / XLSM / ODS)
+                var isZip = u8.length > 4 && u8[0] === 0x50 && u8[1] === 0x4B;
+                if (isZip) {
+                    try {
+                        var result = SpreadsheetParser.parseXlsxZip(u8);
+                        if (result && result.length > 0 && result.some(function(s) { return s.rows && s.rows.length > 0; })) {
+                            return result;
+                        }
+                    } catch (e) {
+                        console.warn('XLSX ZIP parse notice:', e);
+                    }
                 }
 
-                if (xlsxEngine && typeof xlsxEngine.read === 'function') {
-                    const arrayBuf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-                    const workbook = xlsxEngine.read(arrayBuf, { type: 'array' });
-                    const sheetNames = workbook.SheetNames || [];
-                    sheetNames.forEach(sName => {
-                        const ws = workbook.Sheets[sName];
-                        if (ws) {
-                            const rows = xlsxEngine.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                            sheets.push({ name: sName, rows: rows });
+                // 2. Check if OLE2 Compound Binary (.xls 97-2004)
+                var isOle = u8.length > 8 && u8[0] === 0xD0 && u8[1] === 0xCF && u8[2] === 0x11 && u8[3] === 0xE0;
+                if (isOle) {
+                    try {
+                        var result = SpreadsheetParser.parseBiff8Xls(u8);
+                        if (result && result.length > 0 && result.some(function(s) { return s.rows && s.rows.length > 0; })) {
+                            return result;
+                        }
+                    } catch (e) {
+                        console.warn('BIFF8 XLS parse notice:', e);
+                    }
+                }
+
+                // 3. Plain CSV / TSV fallback
+                return SpreadsheetParser.parseCsv(u8, lowerName);
+            },
+
+            parseXlsxZip: function(u8) {
+                if (typeof fflate === 'undefined' || !fflate.unzipSync) return [];
+                var files = fflate.unzipSync(u8);
+                var sheets = [];
+
+                // 1. Parse Shared Strings (xl/sharedStrings.xml)
+                var sharedStrings = [];
+                var ssFile = files['xl/sharedStrings.xml'] || files['xl/SharedStrings.xml'] || files['xl/sharedstrings.xml'];
+                if (ssFile) {
+                    var ssXml = new TextDecoder('utf-8', { fatal: false }).decode(ssFile);
+                    var siMatches = ssXml.matchAll(/<si\\b[^>]*>(.*?)<\\/si>/gs);
+                    for (var si of siMatches) {
+                        var siContent = si[1];
+                        var tMatches = siContent.matchAll(/<t\\b[^>]*>(.*?)<\\/t>/gs);
+                        var fullStr = '';
+                        for (var tm of tMatches) {
+                            fullStr += SpreadsheetParser.decodeXmlEntities(tm[1]);
+                        }
+                        sharedStrings.push(fullStr);
+                    }
+                }
+
+                // 2. Parse Number Formats & Styles (xl/styles.xml)
+                var numFormats = {};
+                var cellXfs = [];
+                var stylesFile = files['xl/styles.xml'] || files['xl/Styles.xml'] || files['xl/styles.XML'];
+                if (stylesFile) {
+                    var stylesXml = new TextDecoder('utf-8', { fatal: false }).decode(stylesFile);
+                    var numFmtMatches = stylesXml.matchAll(/<numFmt\\b[^>]*numFmtId="(\\d+)"[^>]*formatCode="([^"]*)"/g);
+                    for (var nf of numFmtMatches) {
+                        numFormats[parseInt(nf[1], 10)] = nf[2];
+                    }
+                    var xfMatches = stylesXml.matchAll(/<xf\\b[^>]*numFmtId="(\\d+)"/g);
+                    for (var xf of xfMatches) {
+                        cellXfs.push(parseInt(xf[1], 10));
+                    }
+                }
+
+                // 3. Parse Relationships (xl/_rels/workbook.xml.rels)
+                var relsMap = {};
+                var relsFile = files['xl/_rels/workbook.xml.rels'] || files['xl/_rels/Workbook.xml.rels'];
+                if (relsFile) {
+                    var relsXml = new TextDecoder('utf-8', { fatal: false }).decode(relsFile);
+                    var relMatches = relsXml.matchAll(/<Relationship\\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g);
+                    for (var rm of relMatches) {
+                        var target = rm[2];
+                        if (!target.startsWith('xl/') && !target.startsWith('/')) {
+                            target = 'xl/' + target.replace(/^\\.\\//, '');
+                        }
+                        target = target.replace(/^\\//, '');
+                        relsMap[rm[1]] = target;
+                    }
+                }
+
+                // 4. Parse Workbook Structure (xl/workbook.xml)
+                var sheetList = [];
+                var wbFile = files['xl/workbook.xml'] || files['xl/Workbook.xml'];
+                if (wbFile) {
+                    var wbXml = new TextDecoder('utf-8', { fatal: false }).decode(wbFile);
+                    var sheetMatches = wbXml.matchAll(/<sheet\\b[^>]*name="([^"]+)"[^>]*sheetId="(\\d+)"(?:[^>]*r:id="([^"]+)")?/g);
+                    for (var sm of sheetMatches) {
+                        var sName = SpreadsheetParser.decodeXmlEntities(sm[1]);
+                        var sId = sm[2];
+                        var rId = sm[3] || '';
+                        var pathFromRel = relsMap[rId];
+                        sheetList.push({ name: sName, id: sId, rId: rId, path: pathFromRel });
+                    }
+                }
+
+                // Fallback: If no sheets found in workbook.xml, detect from filenames
+                if (sheetList.length === 0) {
+                    Object.keys(files).forEach(function(key, idx) {
+                        var lk = key.toLowerCase();
+                        if (lk.startsWith('xl/worksheets/sheet') && lk.endsWith('.xml')) {
+                            sheetList.push({ name: 'Sheet ' + (idx + 1), path: key });
                         }
                     });
                 }
-            } catch (err) {
-                console.warn('XLSX engine notice:', err);
-            }
 
-            // 2. OpenXML spreadsheet fallback
-            const isZip = bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4B;
-            if (sheets.length === 0 && isZip && fflate && fflate.unzipSync) {
-                try {
-                    const files = fflate.unzipSync(bytes);
-                    const sharedStrings = [];
-                    const ssFile = files['xl/sharedStrings.xml'] || files['xl/SharedStrings.xml'];
-                    if (ssFile) {
-                        const ssXml = (new TextDecoder()).decode(ssFile);
-                        const parser = new DOMParser();
-                        const ssDoc = parser.parseFromString(ssXml, 'application/xml');
-                        const siElements = ssDoc.getElementsByTagName('si');
-                        for (let i = 0; i < siElements.length; i++) {
-                            const tNodes = siElements[i].getElementsByTagName('t');
-                            let sText = '';
-                            for (let j = 0; j < tNodes.length; j++) {
-                                sText += tNodes[j].textContent || '';
+                // 5. Parse Each Worksheet XML
+                sheetList.forEach(function(sheetInfo, sheetIdx) {
+                    var possiblePaths = [
+                        sheetInfo.path,
+                        'xl/' + sheetInfo.path,
+                        'xl/worksheets/sheet' + sheetInfo.id + '.xml',
+                        'xl/worksheets/Sheet' + sheetInfo.id + '.xml',
+                        'xl/worksheets/sheet' + (sheetIdx + 1) + '.xml',
+                        'xl/worksheets/Sheet' + (sheetIdx + 1) + '.xml'
+                    ].filter(Boolean);
+
+                    var sheetFile = null;
+                    for (var p of possiblePaths) {
+                        if (files[p]) { sheetFile = files[p]; break; }
+                    }
+
+                    if (!sheetFile) return;
+
+                    var sheetXml = new TextDecoder('utf-8', { fatal: false }).decode(sheetFile);
+                    var sheetRows = [];
+                    
+                    var rowMatches = sheetXml.matchAll(/<row\\b[^>]*(?:r="(\\d+)")?[^>]*>(.*?)<\\/row>/gs);
+                    var lastRowIndex = 0;
+
+                    for (var rowMatch of rowMatches) {
+                        var rowNumAttr = rowMatch[1];
+                        var rowContent = rowMatch[2];
+                        var rowIndex = rowNumAttr ? parseInt(rowNumAttr, 10) : (lastRowIndex + 1);
+                        lastRowIndex = rowIndex;
+
+                        var rowData = [];
+                        var maxColIndex = 0;
+                        var autoCol = 0;
+
+                        var cellMatches = rowContent.matchAll(/<c\\b([^>]*)>(.*?)<\\/c>|<c\\b([^>]*)\\/\\>/gs);
+                        for (var cm of cellMatches) {
+                            var attrs = cm[1] || cm[3] || '';
+                            var inner = cm[2] || '';
+
+                            var rMatch = attrs.match(/r="([A-Z0-9]+)"/i);
+                            var tMatch = attrs.match(/t="([a-zA-Z]+)"/i);
+                            var sMatch = attrs.match(/s="(\\d+)"/i);
+
+                            var rAttr = rMatch ? rMatch[1] : '';
+                            var tAttr = tMatch ? tMatch[1] : 'n';
+                            var sAttr = sMatch ? parseInt(sMatch[1], 10) : 0;
+
+                            var colIdx = autoCol;
+                            if (rAttr) {
+                                var colLetters = rAttr.replace(/[0-9]/g, '').toUpperCase();
+                                if (colLetters.length > 0) {
+                                    var cNum = 0;
+                                    for (var k = 0; k < colLetters.length; k++) {
+                                        cNum = cNum * 26 + (colLetters.charCodeAt(k) - 64);
+                                    }
+                                    colIdx = cNum > 0 ? cNum - 1 : autoCol;
+                                }
                             }
-                            sharedStrings.push(sText);
+                            autoCol = colIdx + 1;
+
+                            var cellVal = '';
+                            if (tAttr === 's') {
+                                var vMatch = inner.match(/<v\\b[^>]*>(.*?)<\\/v>/s);
+                                if (vMatch) {
+                                    var sIdx = parseInt(vMatch[1].trim(), 10);
+                                    cellVal = sharedStrings[sIdx] !== undefined ? sharedStrings[sIdx] : '';
+                                }
+                            } else if (tAttr === 'inlineStr') {
+                                var tMatchInner = inner.match(/<t\\b[^>]*>(.*?)<\\/t>/s);
+                                cellVal = tMatchInner ? SpreadsheetParser.decodeXmlEntities(tMatchInner[1]) : '';
+                            } else if (tAttr === 'b') {
+                                var vMatch = inner.match(/<v\\b[^>]*>(.*?)<\\/v>/s);
+                                var bVal = vMatch ? vMatch[1].trim() : '';
+                                cellVal = bVal === '1' ? 'TRUE' : (bVal === '0' ? 'FALSE' : bVal);
+                            } else if (tAttr === 'str') {
+                                var vMatch = inner.match(/<v\\b[^>]*>(.*?)<\\/v>/s);
+                                cellVal = vMatch ? SpreadsheetParser.decodeXmlEntities(vMatch[1]) : '';
+                            } else if (tAttr === 'e') {
+                                var vMatch = inner.match(/<v\\b[^>]*>(.*?)<\\/v>/s);
+                                cellVal = vMatch ? vMatch[1].trim() : '#ERROR';
+                            } else {
+                                var vMatch = inner.match(/<v\\b[^>]*>(.*?)<\\/v>/s);
+                                if (vMatch) {
+                                    var rawNum = vMatch[1].trim();
+                                    var numFmtId = cellXfs[sAttr] || 0;
+                                    cellVal = SpreadsheetParser.formatNumberCell(rawNum, numFmtId, numFormats[numFmtId]);
+                                } else {
+                                    var fMatch = inner.match(/<f\\b[^>]*>(.*?)<\\/f>/s);
+                                    if (fMatch) cellVal = '=' + SpreadsheetParser.decodeXmlEntities(fMatch[1]);
+                                }
+                            }
+
+                            rowData[colIdx] = cellVal;
+                            if (colIdx > maxColIndex) maxColIndex = colIdx;
+                        }
+
+                        var normalizedRow = [];
+                        for (var k = 0; k <= maxColIndex; k++) {
+                            normalizedRow.push(rowData[k] !== undefined ? rowData[k] : '');
+                        }
+
+                        if (normalizedRow.some(function(cell) { return String(cell).trim().length > 0; })) {
+                            sheetRows.push(normalizedRow);
                         }
                     }
 
-                    const wbFile = files['xl/workbook.xml'] || files['xl/Workbook.xml'];
-                    const sheetMeta = [];
-                    if (wbFile) {
-                        const wbXml = (new TextDecoder()).decode(wbFile);
-                        const parser = new DOMParser();
-                        const wbDoc = parser.parseFromString(wbXml, 'application/xml');
-                        const sNodes = wbDoc.getElementsByTagName('sheet');
-                        for (let i = 0; i < sNodes.length; i++) {
-                            const sName = sNodes[i].getAttribute('name') || ('Sheet ' + (i + 1));
-                            const sId = sNodes[i].getAttribute('sheetId') || (i + 1);
-                            sheetMeta.push({ name: sName, id: sId });
-                        }
-                    }
-
-                    if (sheetMeta.length === 0) {
-                        Object.keys(files).forEach((key, idx) => {
-                            const lk = key.toLowerCase();
-                            if (lk.startsWith('xl/worksheets/sheet') && lk.endsWith('.xml')) {
-                                sheetMeta.push({ name: 'Sheet ' + (idx + 1), path: key });
-                            }
+                    if (sheetRows.length > 0) {
+                        sheets.push({
+                            name: sheetInfo.name || ('Sheet ' + (sheetIdx + 1)),
+                            rows: sheetRows
                         });
                     }
+                });
 
-                    sheetMeta.forEach((sm, smIdx) => {
-                        const possiblePaths = [
-                            sm.path,
-                            'xl/worksheets/sheet' + sm.id + '.xml',
-                            'xl/worksheets/sheet' + (smIdx + 1) + '.xml',
-                            'xl/worksheets/Sheet' + (smIdx + 1) + '.xml'
-                        ].filter(Boolean);
+                return sheets;
+            },
 
-                        let sheetFile = null;
-                        for (let p of possiblePaths) {
-                            if (files[p]) { sheetFile = files[p]; break; }
+            parseBiff8Xls: function(u8) {
+                var textRuns = [];
+                var len = u8.length;
+                
+                for (var i = 0; i < len - 8; i++) {
+                    var runLen = 0;
+                    while (i + runLen + 1 < len) {
+                        var c = u8[i + runLen] | (u8[i + runLen + 1] << 8);
+                        if (c >= 32 && c <= 126 && c !== 0) {
+                            runLen += 2;
+                        } else {
+                            break;
                         }
-
-                        if (sheetFile) {
-                            const sheetXml = (new TextDecoder()).decode(sheetFile);
-                            const parser = new DOMParser();
-                            const sDoc = parser.parseFromString(sheetXml, 'application/xml');
-                            const rowNodes = sDoc.getElementsByTagName('row');
-                            const sheetRows = [];
-
-                            for (let r = 0; r < rowNodes.length; r++) {
-                                const rowEl = rowNodes[r];
-                                const cNodes = rowEl.getElementsByTagName('c');
-                                const rowData = [];
-                                let maxColIdx = 0;
-
-                                for (let c = 0; c < cNodes.length; c++) {
-                                    const cEl = cNodes[c];
-                                    const rAttr = cEl.getAttribute('r') || '';
-                                    const tAttr = cEl.getAttribute('t') || '';
-                                    const vNode = cEl.getElementsByTagName('v')[0];
-                                    let cellVal = '';
-
-                                    if (tAttr === 's' && vNode) {
-                                        const sIdx = parseInt(vNode.textContent || '0', 10);
-                                        cellVal = sharedStrings[sIdx] || '';
-                                    } else if (tAttr === 'inlineStr') {
-                                        const tNode = cEl.getElementsByTagName('t')[0];
-                                        cellVal = tNode ? tNode.textContent : '';
-                                    } else if (vNode) {
-                                        cellVal = vNode.textContent || '';
-                                    }
-
-                                    let colLetters = '';
-                                    for (let ci = 0; ci < rAttr.length; ci++) {
-                                        const ch = rAttr.charAt(ci);
-                                        if (ch >= 'A' && ch <= 'Z') colLetters += ch;
-                                    }
-
-                                    let colIndex = 0;
-                                    for (let k = 0; k < colLetters.length; k++) {
-                                        colIndex = colIndex * 26 + (colLetters.charCodeAt(k) - 64);
-                                    }
-                                    const zeroBasedCol = colIndex > 0 ? (colIndex - 1) : c;
-                                    rowData[zeroBasedCol] = cellVal;
-                                    if (zeroBasedCol > maxColIdx) maxColIdx = zeroBasedCol;
-                                }
-
-                                const normalizedRow = [];
-                                for (let k = 0; k <= maxColIdx; k++) {
-                                    normalizedRow.push(rowData[k] !== undefined ? rowData[k] : '');
-                                }
-                                if (normalizedRow.some(cell => String(cell).trim().length > 0)) {
-                                    sheetRows.push(normalizedRow);
-                                }
-                            }
-
-                            sheets.push({
-                                name: sm.name,
-                                rows: sheetRows
-                            });
-                        }
-                    });
-                } catch (e) {
-                    console.warn('OpenXML spreadsheet parsing fallback:', e);
-                }
-            }
-
-            // 3. Plain CSV/TSV fallback
-            if (sheets.length === 0) {
-                try {
-                    const text = (new TextDecoder('utf-8', { fatal: false })).decode(bytes);
-                    const delimiter = name.toLowerCase().endsWith('.tsv') ? '\t' : (text.includes('\t') ? '\t' : (text.includes(';') ? ';' : ','));
-                    const rawLines = text.split(String.fromCharCode(10)).map(l => l.endsWith(String.fromCharCode(13)) ? l.slice(0, -1) : l).filter(l => l.trim().length > 0);
-                    const rows = rawLines.map(line => line.split(delimiter).map(c => {
-                        c = c.trim();
-                        if ((c.startsWith('"') && c.endsWith('"')) || (c.startsWith("'") && c.endsWith("'"))) {
-                            c = c.slice(1, -1);
-                        }
-                        return c;
-                    }));
-                    if (rows.length > 0) {
-                        sheets.push({ name: 'Data', rows: rows });
                     }
-                } catch (e) {}
-            }
+                    if (runLen >= 6) {
+                        var str = new TextDecoder('utf-16le', { fatal: false }).decode(u8.subarray(i, i + runLen)).trim();
+                        if (str.length >= 3 && !str.includes('Root Entry') && !str.includes('Workbook') && !str.includes('SummaryInformation')) {
+                            textRuns.push(str);
+                        }
+                        i += runLen;
+                    }
+                }
 
-            if (sheets.length === 0 || (sheets.length === 1 && sheets[0].rows.length === 0)) {
+                for (var i = 0; i < len - 4; i++) {
+                    var runLen = 0;
+                    while (i + runLen < len) {
+                        var b = u8[i + runLen];
+                        if ((b >= 32 && b <= 126) || b === 9 || b === 10 || b === 13) {
+                            runLen++;
+                        } else {
+                            break;
+                        }
+                    }
+                    if (runLen >= 4) {
+                        var str = new TextDecoder('latin1').decode(u8.subarray(i, i + runLen)).trim();
+                        if (str.length >= 3 && !str.includes('CompObj') && !str.includes('Microsoft Excel')) {
+                            textRuns.push(str);
+                        }
+                        i += runLen;
+                    }
+                }
+
+                var unique = Array.from(new Set(textRuns)).filter(function(s) { return s.length > 1; });
+                if (unique.length > 0) {
+                    var rows = [];
+                    var colsPerChunk = 4;
+                    for (var i = 0; i < unique.length; i += colsPerChunk) {
+                        rows.push(unique.slice(i, i + colsPerChunk));
+                    }
+                    return [{ name: 'Workbook', rows: rows }];
+                }
+
+                return [];
+            },
+
+            parseCsv: function(u8, filename) {
+                var text = new TextDecoder('utf-8', { fatal: false }).decode(u8);
+                var delimiter = filename.endsWith('.tsv') ? '\t' : (text.includes('\t') && !text.includes(',') ? '\t' : (text.includes(';') && !text.includes(',') ? ';' : ','));
+                var lines = text.split(/\\r?\\n/).filter(function(l) { return l.trim().length > 0; });
+                var rows = [];
+                
+                for (var line of lines) {
+                    var row = [];
+                    var inQuotes = false;
+                    var current = '';
+                    for (var i = 0; i < line.length; i++) {
+                        var char = line[i];
+                        if (char === '"' || char === "'") {
+                            inQuotes = !inQuotes;
+                        } else if (char === delimiter && !inQuotes) {
+                            row.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    row.push(current.trim());
+                    if (row.some(function(c) { return c.length > 0; })) {
+                        rows.push(row);
+                    }
+                }
+
+                return [{ name: 'Data', rows: rows }];
+            },
+
+            decodeXmlEntities: function(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&apos;/g, "'")
+                    .replace(/&#(\\d+);/g, function(_, num) { return String.fromCharCode(parseInt(num, 10)); })
+                    .replace(/&#x([0-9a-fA-F]+);/g, function(_, hex) { return String.fromCharCode(parseInt(hex, 16)); });
+            },
+
+            formatNumberCell: function(rawNum, numFmtId, customFmt) {
+                var num = parseFloat(rawNum);
+                if (isNaN(num)) return rawNum;
+
+                // Date formats
+                var isDateFmt = (numFmtId >= 14 && numFmtId <= 22) ||
+                    (numFmtId >= 27 && numFmtId <= 36) ||
+                    (numFmtId >= 45 && numFmtId <= 47) ||
+                    (customFmt && /[ymdhs]/i.test(customFmt) && !/[#0]/.test(customFmt));
+
+                if (isDateFmt && num > 0 && num < 2958465) {
+                    var date = new Date(Math.round((num - 25569) * 86400 * 1000));
+                    if (!isNaN(date.getTime())) {
+                        var yyyy = date.getUTCFullYear();
+                        var mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+                        var dd = String(date.getUTCDate()).padStart(2, '0');
+                        if (num % 1 === 0) {
+                            return yyyy + '-' + mm + '-' + dd;
+                        } else {
+                            var hh = String(date.getUTCHours()).padStart(2, '0');
+                            var min = String(date.getUTCMinutes()).padStart(2, '0');
+                            var ss = String(date.getUTCSeconds()).padStart(2, '0');
+                            return yyyy + '-' + mm + '-' + dd + ' ' + hh + ':' + min + ':' + ss;
+                        }
+                    }
+                }
+
+                // Percentage formats
+                if (numFmtId === 9 || numFmtId === 10 || (customFmt && customFmt.includes('%'))) {
+                    return (num * 100).toFixed(numFmtId === 9 ? 0 : 1) + '%';
+                }
+
+                // Currency formats
+                if ((numFmtId >= 5 && numFmtId <= 8) || (numFmtId >= 41 && numFmtId <= 44) || (customFmt && (customFmt.includes('$') || customFmt.includes('€') || customFmt.includes('£')))) {
+                    var symbol = (customFmt && customFmt.includes('€')) ? '€' : ((customFmt && customFmt.includes('£')) ? '£' : '$');
+                    return symbol + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+
+                // General integers
+                if (Number.isInteger(num)) {
+                    return num.toString();
+                }
+
+                // Float
+                return parseFloat(num.toFixed(4)).toString();
+            }
+        };
+
+        function renderExcelSpreadsheet(bytes, name, container, allowDl, dlBlob) {
+            container.innerHTML = '';
+            var wrapper = document.createElement('div');
+            wrapper.className = 'doc-viewer-container';
+
+            var sheets = SpreadsheetParser.parse(bytes, name);
+
+            if (!sheets || sheets.length === 0 || (sheets.length === 1 && sheets[0].rows.length === 0)) {
                 sheets = [{ name: 'Sheet 1', rows: [['(Empty spreadsheet or format preview unavailable)']] }];
             }
 
-            let activeSheetIdx = 0;
-            let searchQuery = '';
+            var activeSheetIdx = 0;
+            var searchQuery = '';
+            var currentZoom = 100;
 
             function renderUI() {
                 wrapper.innerHTML = '';
 
-                const currentSheet = sheets[activeSheetIdx] || { rows: [] };
-                let rowsToDisplay = currentSheet.rows || [];
-                let maxCols = 0;
-                rowsToDisplay.forEach(r => { if (r && r.length > maxCols) maxCols = r.length; });
+                var currentSheet = sheets[activeSheetIdx] || { rows: [] };
+                var rowsToDisplay = currentSheet.rows || [];
+                var maxCols = 0;
+                rowsToDisplay.forEach(function(r) { if (r && r.length > maxCols) maxCols = r.length; });
 
-                const toolbar = document.createElement('div');
+                var toolbar = document.createElement('div');
                 toolbar.className = 'doc-toolbar';
 
-                const toolLeft = document.createElement('div');
+                var toolLeft = document.createElement('div');
                 toolLeft.className = 'doc-toolbar-left';
                 toolLeft.innerHTML = '<span class="doc-format-badge doc-badge-excel"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg> EXCEL SPREADSHEET</span><span class="doc-filename" title="' + escapeHTML(name) + '">' + escapeHTML(name) + '</span><span class="doc-stats-badge">' + rowsToDisplay.length + ' Rows &times; ' + maxCols + ' Cols</span>';
 
-                const toolRight = document.createElement('div');
+                var toolRight = document.createElement('div');
                 toolRight.className = 'doc-toolbar-right';
 
-                const searchBox = document.createElement('div');
+                // Search box with match count
+                var searchBox = document.createElement('div');
                 searchBox.className = 'doc-search-box';
                 searchBox.innerHTML = '<svg class="doc-search-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-                const searchInput = document.createElement('input');
+                var searchInput = document.createElement('input');
                 searchInput.type = 'text';
                 searchInput.className = 'doc-search-input';
                 searchInput.placeholder = 'Search sheet cells...';
                 searchInput.value = searchQuery;
-                searchInput.addEventListener('input', (e) => {
-                    searchQuery = e.target.value.toLowerCase();
+                searchInput.addEventListener('input', function(e) {
+                    searchQuery = e.target.value.toLowerCase().trim();
                     renderTable();
                 });
                 searchBox.appendChild(searchInput);
                 toolRight.appendChild(searchBox);
 
+                // Zoom controls
+                var zoomControls = document.createElement('div');
+                zoomControls.className = 'doc-zoom-controls';
+                zoomControls.innerHTML = '<button type="button" class="doc-zoom-btn" id="excel-zoom-out" title="Zoom Out">&minus;</button><span class="doc-zoom-label" id="excel-zoom-label">' + currentZoom + '%</span><button type="button" class="doc-zoom-btn" id="excel-zoom-in" title="Zoom In">+</button>';
+                toolRight.appendChild(zoomControls);
+
                 if (allowDl && dlBlob) {
-                    const dlBtn = document.createElement('button');
+                    var dlBtn = document.createElement('button');
                     dlBtn.type = 'button';
                     dlBtn.className = 'viewer-btn-dl';
                     dlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>DOWNLOAD</span>';
-                    dlBtn.onclick = () => triggerDownload(dlBlob, name);
+                    dlBtn.onclick = function() { triggerDownload(dlBlob, name); };
                     toolRight.appendChild(dlBtn);
                 }
 
@@ -4402,15 +4871,16 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                 toolbar.appendChild(toolRight);
                 wrapper.appendChild(toolbar);
 
+                // Sheet tabs
                 if (sheets.length > 1) {
-                    const tabsBar = document.createElement('div');
+                    var tabsBar = document.createElement('div');
                     tabsBar.className = 'excel-tabs-bar';
-                    sheets.forEach((sh, idx) => {
-                        const tabBtn = document.createElement('button');
+                    sheets.forEach(function(sh, idx) {
+                        var tabBtn = document.createElement('button');
                         tabBtn.type = 'button';
                         tabBtn.className = 'excel-tab-btn' + (idx === activeSheetIdx ? ' active' : '');
                         tabBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ' + escapeHTML(sh.name) + ' <span class="excel-tab-count">(' + (sh.rows ? sh.rows.length : 0) + ')</span>';
-                        tabBtn.onclick = () => {
+                        tabBtn.onclick = function() {
                             activeSheetIdx = idx;
                             searchQuery = '';
                             renderUI();
@@ -4420,41 +4890,73 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     wrapper.appendChild(tabsBar);
                 }
 
-                const tableScroll = document.createElement('div');
+                var tableScroll = document.createElement('div');
                 tableScroll.className = 'excel-table-scroll';
                 wrapper.appendChild(tableScroll);
 
+                // Hook up Zoom buttons
+                var zoomOutBtn = zoomControls.querySelector('#excel-zoom-out');
+                var zoomInBtn = zoomControls.querySelector('#excel-zoom-in');
+                var zoomLabel = zoomControls.querySelector('#excel-zoom-label');
+
+                function applyZoom() {
+                    zoomLabel.textContent = currentZoom + '%';
+                    var tableEl = tableScroll.querySelector('table');
+                    if (tableEl) {
+                        tableEl.style.fontSize = Math.round(12 * (currentZoom / 100)) + 'px';
+                    }
+                }
+
+                zoomOutBtn.onclick = function() {
+                    if (currentZoom > 50) {
+                        currentZoom -= 15;
+                        applyZoom();
+                    }
+                };
+                zoomInBtn.onclick = function() {
+                    if (currentZoom < 200) {
+                        currentZoom += 15;
+                        applyZoom();
+                    }
+                };
+
                 function renderTable() {
                     tableScroll.innerHTML = '';
-                    let filtered = currentSheet.rows || [];
+                    var allRows = currentSheet.rows || [];
+                    var filtered = allRows;
 
-                    if (searchQuery.trim().length > 0) {
-                        filtered = filtered.filter(r => (r || []).some(c => String(c).toLowerCase().includes(searchQuery)));
+                    if (searchQuery.length > 0) {
+                        filtered = allRows.filter(function(r) {
+                            return (r || []).some(function(c) {
+                                return String(c).toLowerCase().includes(searchQuery);
+                            });
+                        });
                     }
 
                     if (filtered.length === 0) {
-                        tableScroll.innerHTML = '<div class="excel-empty-state">No matching rows found in this sheet.</div>';
+                        tableScroll.innerHTML = '<div class="excel-empty-state">No matching rows found in this sheet for &quot;' + escapeHTML(searchQuery) + '&quot;.</div>';
                         return;
                     }
 
-                    let curMaxCols = 0;
-                    filtered.forEach(r => { if (r && r.length > curMaxCols) curMaxCols = r.length; });
+                    var curMaxCols = 0;
+                    filtered.forEach(function(r) { if (r && r.length > curMaxCols) curMaxCols = r.length; });
                     if (curMaxCols === 0) curMaxCols = 1;
 
-                    const table = document.createElement('table');
+                    var table = document.createElement('table');
                     table.className = 'excel-grid-table';
+                    table.style.fontSize = Math.round(12 * (currentZoom / 100)) + 'px';
 
-                    const thead = document.createElement('thead');
-                    const hdrTr = document.createElement('tr');
-                    const cornerTh = document.createElement('th');
+                    var thead = document.createElement('thead');
+                    var hdrTr = document.createElement('tr');
+                    var cornerTh = document.createElement('th');
                     cornerTh.className = 'row-index-hdr';
                     cornerTh.textContent = '#';
                     hdrTr.appendChild(cornerTh);
 
-                    for (let c = 0; c < curMaxCols; c++) {
-                        const th = document.createElement('th');
-                        let colName = '';
-                        let temp = c;
+                    for (var c = 0; c < curMaxCols; c++) {
+                        var th = document.createElement('th');
+                        var colName = '';
+                        var temp = c;
                         while (temp >= 0) {
                             colName = String.fromCharCode(65 + (temp % 26)) + colName;
                             temp = Math.floor(temp / 26) - 1;
@@ -4465,25 +4967,27 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     thead.appendChild(hdrTr);
                     table.appendChild(thead);
 
-                    const tbody = document.createElement('tbody');
-                    filtered.forEach((row, rIdx) => {
-                        const tr = document.createElement('tr');
-                        const rowNumTd = document.createElement('td');
+                    var tbody = document.createElement('tbody');
+                    filtered.forEach(function(row, rIdx) {
+                        var tr = document.createElement('tr');
+                        var rowNumTd = document.createElement('td');
                         rowNumTd.className = 'row-num';
                         rowNumTd.textContent = (rIdx + 1);
                         tr.appendChild(rowNumTd);
 
-                        for (let c = 0; c < curMaxCols; c++) {
-                            const td = document.createElement('td');
-                            const rawVal = row && row[c] !== undefined ? row[c] : '';
-                            const strVal = String(rawVal);
+                        for (var c = 0; c < curMaxCols; c++) {
+                            var td = document.createElement('td');
+                            var rawVal = row && row[c] !== undefined ? row[c] : '';
+                            var strVal = String(rawVal);
                             td.textContent = strVal;
 
-                            if (typeof rawVal === 'number' || (!isNaN(rawVal) && strVal.trim() !== '')) {
+                            if (typeof rawVal === 'number' || (!isNaN(rawVal) && strVal.trim() !== '' && !strVal.includes('-') && !strVal.includes('/'))) {
+                                td.style.textAlign = 'right';
+                            } else if (strVal.startsWith('$') || strVal.startsWith('€') || strVal.startsWith('£') || strVal.endsWith('%')) {
                                 td.style.textAlign = 'right';
                             }
 
-                            if (searchQuery && strVal.toLowerCase().includes(searchQuery)) {
+                            if (searchQuery.length > 0 && strVal.toLowerCase().includes(searchQuery)) {
                                 td.classList.add('excel-search-match');
                             }
                             tr.appendChild(td);
@@ -7233,7 +7737,7 @@ async function openViewer(fileRecord, fileKey) {
       iframe.style.border = 'none';
       container.appendChild(iframe);
     } else if (isExcel) {
-      renderExcelToHTML(decryptedBuffer, container);
+      renderExcelToHTML(decryptedBuffer, container, fileRecord.name);
     } else if (isWord) {
       await renderWordToHTML(decryptedBuffer, container);
     } else if (isPpt) {
