@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#05070A" />
   <meta name="description" content="Coralgenz Vault — Enterprise-Grade High-Security Cryptographic File Protection System with Zero-Knowledge AES-256 Encryption." />
-  <!-- Military-Grade Security Headers: Anti-Cache, Anti-Virus, Anti-Spyware & Zero Network Leakage -->
+  <!-- Standard Security & Cache Control Headers -->
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -39,284 +39,13 @@
       display: none !important;
     }
 
-    /* Enterprise Anti-Inspection Security Shield Overlay */
-    #vault-security-shield {
-      position: fixed;
-      inset: 0;
-      z-index: 99999999;
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.98), #030712);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      text-align: center;
-      font-family: 'Inter', system-ui, sans-serif;
-      animation: shieldFadeIn 0.3s ease-out;
-    }
-    #vault-security-shield.shield-hidden {
-      display: none !important;
-    }
-    @keyframes shieldFadeIn {
-      from { opacity: 0; transform: scale(0.98); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .shield-card {
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid rgba(225, 29, 72, 0.4);
-      box-shadow: 0 0 50px rgba(225, 29, 72, 0.25), 0 25px 50px -12px rgba(0, 0, 0, 0.8);
-      border-radius: 16px;
-      padding: 36px 32px;
-      max-width: 520px;
-      width: 100%;
-    }
-    .shield-icon-wrap {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      background: rgba(225, 29, 72, 0.12);
-      border: 1px solid rgba(225, 29, 72, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 20px;
-      color: #f43f5e;
-      box-shadow: 0 0 20px rgba(225, 29, 72, 0.2);
-    }
-    .shield-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: #ffffff;
-      letter-spacing: 0.05em;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-    }
-    .shield-status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(225, 29, 72, 0.15);
-      border: 1px solid rgba(225, 29, 72, 0.35);
-      color: #fb7185;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      margin-bottom: 16px;
-      letter-spacing: 0.05em;
-    }
-    .shield-desc {
-      font-size: 14px;
-      color: #94a3b8;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-    .shield-reload-btn {
-      background: linear-gradient(135deg, #e11d48, #be123c);
-      color: #ffffff;
-      border: none;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 13px;
-      padding: 12px 24px;
-      border-radius: 8px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      letter-spacing: 0.05em;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);
-    }
-    .shield-reload-btn:hover {
-      background: linear-gradient(135deg, #f43f5e, #e11d48);
-      box-shadow: 0 6px 20px rgba(225, 29, 72, 0.5);
-      transform: translateY(-1px);
-    }
+
   </style>
-
-  <!-- Security Guardian: Anti-Inspection, Anti-DevTools & Source Code Isolation -->
-  <script>
-    (function() {
-      'use strict';
-
-      // 1. Console Sanitization & Silence
-      try {
-        const noop = function() {};
-        ['log', 'debug', 'info', 'warn', 'error', 'dir', 'table', 'trace'].forEach(function(m) {
-          try { console[m] = noop; } catch(e) {}
-        });
-        if (typeof console.clear === 'function') console.clear();
-      } catch(e) {}
-
-      // 2. Prevent Right-Click Context Menu (Inspect Element Trigger)
-      window.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }, true);
-      document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }, true);
-
-      // 3. Intercept DevTools & Source View Keyboard Shortcuts
-      function blockKeyShortcuts(e) {
-        // F12
-        if (e.key === 'F12' || e.keyCode === 123) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-        // Ctrl+Shift+I / Cmd+Option+I (Inspect)
-        // Ctrl+Shift+J / Cmd+Option+J (Console)
-        // Ctrl+Shift+C / Cmd+Option+C (Elements)
-        // Ctrl+Shift+K (Firefox console)
-        if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey)) {
-          const k = (e.key || '').toLowerCase();
-          const code = e.keyCode;
-          if (k === 'i' || k === 'j' || k === 'c' || k === 'k' || code === 73 || code === 74 || code === 67 || code === 75) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-          }
-        }
-        // Ctrl+U / Cmd+Option+U (View Page Source)
-        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 'u' || e.keyCode === 85)) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-        // Ctrl+S / Cmd+S (Save Page)
-        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 's' || e.keyCode === 83)) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-        // Ctrl+P / Cmd+P (Print)
-        if ((e.ctrlKey || e.metaKey) && ((e.key || '').toLowerCase() === 'p' || e.keyCode === 80)) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-      }
-      window.addEventListener('keydown', blockKeyShortcuts, true);
-      document.addEventListener('keydown', blockKeyShortcuts, true);
-
-      // 4. Prevent Copy, Paste, Cut, Selection, and Drag
-      ['copy', 'cut', 'paste', 'selectstart', 'dragstart'].forEach(function(evt) {
-        document.addEventListener(evt, function(e) {
-          if (e.target && e.target.tagName && (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea')) {
-            return; // Allow in inputs
-          }
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }, true);
-      });
-
-      // 5. Active DevTools Detection & Security Lockdown Shield
-      let isShieldActive = false;
-      function engageSecurityShield() {
-        if (isShieldActive) return;
-        isShieldActive = true;
-        
-        try {
-          // Clear any active session secrets
-          if (window.sessionStorage) window.sessionStorage.clear();
-        } catch(e) {}
-
-        const shield = document.getElementById('vault-security-shield');
-        if (shield) {
-          shield.classList.remove('shield-hidden');
-        }
-        const app = document.getElementById('app');
-        if (app) {
-          app.style.filter = 'blur(45px)';
-          app.style.opacity = '0.05';
-          app.style.pointerEvents = 'none';
-        }
-      }
-
-      function disengageSecurityShield() {
-        if (!isShieldActive) return;
-        isShieldActive = false;
-        const shield = document.getElementById('vault-security-shield');
-        if (shield) {
-          shield.classList.add('shield-hidden');
-        }
-        const app = document.getElementById('app');
-        if (app) {
-          app.style.filter = '';
-          app.style.opacity = '';
-          app.style.pointerEvents = '';
-        }
-      }
-
-      // Check DevTools via window size diff (docked DevTools)
-      function checkWindowDiff() {
-        const threshold = 160;
-        const widthDiff = window.outerWidth - window.innerWidth > threshold;
-        const heightDiff = window.outerHeight - window.innerHeight > threshold;
-        if (widthDiff || heightDiff) {
-          engageSecurityShield();
-        } else if (isShieldActive) {
-          disengageSecurityShield();
-        }
-      }
-      window.addEventListener('resize', checkWindowDiff);
-      setInterval(checkWindowDiff, 1000);
-
-      // 5. Anti-Debugging Dynamic Constructor Trap
-      // If DevTools is opened, pauses execution in anonymous constructor context
-      function startDebuggerTrap() {
-        setInterval(function() {
-          const startTime = performance.now();
-          (function() {
-            return false;
-          })['constructor']('debugger')();
-          const executionTime = performance.now() - startTime;
-          if (executionTime > 100) {
-            engageSecurityShield();
-          }
-        }, 300);
-      }
-      setTimeout(startDebuggerTrap, 800);
-
-    })();
-  </script>
 
   <script type="module" src="/src/main.js"></script>
 </head>
 
 <body class="cyber-fortress-theme">
-  <!-- Enterprise Anti-Inspection Lockdown Shield -->
-  <div id="vault-security-shield" class="shield-hidden">
-    <div class="shield-card">
-      <div class="shield-icon-wrap">
-        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          <line x1="12" y1="8" x2="12" y2="12"/>
-          <line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-      </div>
-      <div class="shield-title">Security Protocol Engaged</div>
-      <div class="shield-status-badge">DEVELOPER INSPECTION DETECTED</div>
-      <p class="shield-desc">
-        Unauthorized browser inspection or debugging activity was detected. In accordance with zero-trust cryptographic defense, sensitive runtime memory and source artifacts have been isolated.
-      </p>
-      <button type="button" class="shield-reload-btn" onclick="window.location.reload()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-        </svg>
-        <span>RESTORE &amp; RELOAD VAULT</span>
-      </button>
-    </div>
-  </div>
 
   <!-- Matrix / Cyber Telemetry Ambient Canvas Background -->
   <canvas id="cyber-matrix-canvas" class="cyber-matrix-canvas"></canvas>
@@ -697,6 +426,22 @@
                       <span id="strength-text" class="strength-text">ENTER PASSWORD</span>
                     </div>
                   </div>
+
+                  <!-- Optional 2FA Secret Pepper Accordion -->
+                  <details class="pepper-accordion" id="pepper-accordion" style="margin-top: 14px; border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 8px; padding: 10px 14px; background: rgba(0, 240, 255, 0.03);">
+                    <summary style="cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: var(--cyber-cyan, #00f0ff); display: flex; align-items: center; gap: 8px; user-select: none;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      <span>ADVANCED: 2FA SECRET PEPPER / SECONDARY KEY SALT (OPTIONAL)</span>
+                    </summary>
+                    <div style="margin-top: 10px;">
+                      <p style="font-size: 11px; color: var(--cyber-text-muted, #94a3b8); margin-bottom: 8px; line-height: 1.4;">
+                        Optional second-factor secret salt. When set, key derivation combines your password with this pepper in memory. Even with full source code & memory dumps, decryption without this secret pepper is mathematically impossible.
+                      </p>
+                      <div class="cyber-input-wrap">
+                        <input type="password" id="new-secret-pepper" placeholder="Enter optional secret pepper (e.g. hardware token or secret key)" class="cyber-input cyber-password-input" autocomplete="off" style="font-size: 12px; padding: 10px 12px;" />
+                      </div>
+                    </div>
+                  </details>
                 </div>
 
                 <!-- Form Action Buttons -->
@@ -788,7 +533,7 @@
               <div class="completion-header-text">
                 <div class="cyber-kicker kicker-green">● PROTECTION PROTOCOL COMPLETE</div>
                 <h2 class="completion-title">FILE SUCCESSFULLY PROTECTED</h2>
-                <p class="completion-desc">Your protected file has been packaged into a standalone protected HTML file with embedded military-grade decryption runtime.</p>
+                <p class="completion-desc">Your protected file has been packaged into a standalone protected HTML file with embedded AES-256-GCM decryption engine.</p>
               </div>
 
               <!-- Protected Output Security Card -->
@@ -1317,11 +1062,11 @@
                 <div class="step-icon-wrap">⚡</div>
                 <div class="step-title-group">
                   <h3 class="step-title">Encrypt in Seconds</h3>
-                  <span class="step-badge">MILITARY-SPEC AES-256-GCM</span>
+                  <span class="step-badge">AUTHENTICATED AES-256-GCM</span>
                 </div>
               </div>
               <p class="step-desc">
-                Tap <strong>"ENCRYPT &amp; PROTECT FILE"</strong>. The high-speed holographic cryptographic engine seals your file with military-grade AES-256 encryption in 1 to 3 seconds.
+                Tap <strong>"ENCRYPT &amp; PROTECT FILE"</strong>. The cryptographic engine seals your file with authenticated AES-256-GCM encryption in 1 to 3 seconds.
               </p>
               <div class="step-tip-callout tip-cyan">
                 <span class="tip-icon">🛡️</span>
