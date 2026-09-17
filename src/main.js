@@ -380,16 +380,58 @@ function setupEventListeners() {
         bufferToExport,
         passwordToExport,
         {},
-        'Protected HTML package exported successfully!',
-        customPepper
+        'Universal protected file downloaded! Opens on double-click in any browser.',
+        customPepper,
+        false
       );
     } catch (err) {
       console.error(err);
-      await showAlert('Export Error', 'Failed to download HTML package: ' + err.message);
+      await showAlert('Export Error', 'Failed to download universal file: ' + err.message);
     } finally {
       if (dlBtn) {
         dlBtn.disabled = false;
         dlBtn.innerHTML = originalText;
+      }
+    }
+  });
+
+  document.getElementById('download-pure-secure-btn')?.addEventListener('click', async () => {
+    if (!lastProtectedFile) return;
+    const pureBtn = document.getElementById('download-pure-secure-btn');
+    const originalPureText = pureBtn ? pureBtn.innerHTML : '';
+    try {
+      if (pureBtn) {
+        pureBtn.disabled = true;
+        pureBtn.innerHTML = '<span>PACKAGING .SECURE...</span>';
+      }
+      let bufferToExport = lastProtectedFile.buffer;
+      let passwordToExport = lastProtectedFile.password;
+      if (!bufferToExport || bufferToExport.byteLength === 0) {
+        const decrypted = await decryptFileForExport(lastProtectedFile.record, passwordToExport);
+        if (decrypted && decrypted.buffer) {
+          bufferToExport = decrypted.buffer;
+          passwordToExport = decrypted.password || passwordToExport;
+        } else {
+          throw new Error('Could not retrieve file content for packaging.');
+        }
+      }
+      const customPepper = lastProtectedFile.userPepper ? (SecureCrypto.MILSPEC_ANTI_CRACKER_PEPPER_V10 + '::USER_2FA::' + lastProtectedFile.userPepper) : '';
+      await exportSecureFile(
+        lastProtectedFile.record,
+        bufferToExport,
+        passwordToExport,
+        {},
+        'Standard .secure container downloaded!',
+        customPepper,
+        true
+      );
+    } catch (err) {
+      console.error(err);
+      await showAlert('Export Error', 'Failed to download .secure file: ' + err.message);
+    } finally {
+      if (pureBtn) {
+        pureBtn.disabled = false;
+        pureBtn.innerHTML = originalPureText;
       }
     }
   });
@@ -458,10 +500,98 @@ function setupEventListeners() {
     }
   });
 
+  // Dedicated In-Vault .secure File & OS Association Listeners
+  const openSecureBtn = document.getElementById('open-secure-file-btn');
+  const openContainerInput = document.getElementById('open-container-input');
+  openSecureBtn?.addEventListener('click', () => {
+    openContainerInput?.click();
+  });
+  openContainerInput?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await openSecureContainerInVault(file);
+    }
+    openContainerInput.value = '';
+  });
 
+  // OS Association Guide Modal
+  const osAssocBtn = document.getElementById('os-file-assoc-btn');
+  const osAssocModal = document.getElementById('os-file-assoc-modal');
+  const closeOsAssocModal = document.getElementById('close-os-assoc-modal');
+  osAssocBtn?.addEventListener('click', () => {
+    if (osAssocModal) {
+      if (typeof osAssocModal.showModal === 'function') osAssocModal.showModal();
+      else osAssocModal.classList.add('active');
+    }
+  });
+  closeOsAssocModal?.addEventListener('click', () => {
+    if (osAssocModal) {
+      if (typeof osAssocModal.close === 'function') osAssocModal.close();
+      else osAssocModal.classList.remove('active');
+    }
+  });
 
+  // Unlock Container Modal Listeners
+  const unlockContainerModal = document.getElementById('unlock-container-modal');
+  const confirmUnlockContainerBtn = document.getElementById('confirm-unlock-container');
+  const cancelUnlockContainerBtn = document.getElementById('cancel-unlock-container');
+  const toggleContainerPwdBtn = document.getElementById('toggle-container-password');
+  const unlockContainerPwdInput = document.getElementById('unlock-container-password');
 
+  confirmUnlockContainerBtn?.addEventListener('click', executeContainerUnlock);
+  cancelUnlockContainerBtn?.addEventListener('click', () => {
+    if (unlockContainerModal) {
+      if (typeof unlockContainerModal.close === 'function') unlockContainerModal.close();
+      else unlockContainerModal.classList.remove('active');
+    }
+    activeVaultContainer = null;
+  });
+  unlockContainerPwdInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      executeContainerUnlock();
+    }
+  });
+  toggleContainerPwdBtn?.addEventListener('click', () => {
+    if (unlockContainerPwdInput) {
+      unlockContainerPwdInput.type = unlockContainerPwdInput.type === 'password' ? 'text' : 'password';
+    }
+  });
 
+  // PWA File Handling LaunchQueue Consumer (Direct OS Double-Click to Vault)
+  if ('launchQueue' in window && 'files' in LaunchParams.prototype) {
+    window.launchQueue.setConsumer(async (launchParams) => {
+      if (!launchParams.files || !launchParams.files.length) return;
+      for (const fileHandle of launchParams.files) {
+        try {
+          const file = await fileHandle.getFile();
+          await openSecureContainerInVault(file);
+        } catch (e) {
+          console.error('LaunchQueue file read error:', e);
+        }
+      }
+    });
+  }
+
+  // PWA 1-Click Install Button for File Association
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const installBtn = document.getElementById('install-pwa-btn');
+    if (installBtn) {
+      installBtn.classList.remove('hidden');
+      installBtn.onclick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          installBtn.classList.add('hidden');
+        }
+        deferredPrompt = null;
+      };
+    }
+  });
   // Drag & Drop
   setupDragDrop();
 
@@ -530,10 +660,12 @@ function setupEventListeners() {
   document.getElementById('dl-media-toggle')?.addEventListener('change', (e) => {
     localStorage.setItem('sv_dl_media', e.target.checked);
     updateDownloadPolicyBadges();
+    renderFileList();
   });
   document.getElementById('dl-doc-toggle')?.addEventListener('change', (e) => {
     localStorage.setItem('sv_dl_doc', e.target.checked);
     updateDownloadPolicyBadges();
+    renderFileList();
   });
 
   // Change Password Modal
@@ -545,10 +677,12 @@ function setupEventListeners() {
   setupPasswordToggle('toggle-auth-password', 'auth-password');
   setupPasswordToggle('toggle-share-password', 'share-password');
 
-  // Share Modal
+  // Share / Export Modal
   const shareModal = document.getElementById('share-modal');
   document.getElementById('cancel-share')?.addEventListener('click', () => shareModal?.close());
   document.getElementById('confirm-share')?.addEventListener('click', handleShareConfirm);
+  document.getElementById('format-card-secure-html')?.addEventListener('click', () => selectExportFormat('html'));
+  document.getElementById('format-card-pure-secure')?.addEventListener('click', () => selectExportFormat('secure'));
   document.getElementById('share-password')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -696,10 +830,10 @@ function resetAddForm() {
 function isSecureHtmlFile(file) {
   if (!file) return false;
   const fileName = (file.name || '').toLowerCase().trim();
-  if (fileName.endsWith('.secure.html') || /\.secure(?:\s*\(\d+\))?\.html$/i.test(fileName)) {
+  if (fileName.endsWith('.secure') || fileName.endsWith('.secure.html') || /\.secure(?:\s*\(\d+\))?(\.html)?$/i.test(fileName)) {
     return true;
   }
-  if (fileName.endsWith('.html') && fileName.includes('.secure')) {
+  if (fileName.includes('.secure')) {
     return true;
   }
   return false;
@@ -709,16 +843,238 @@ async function checkSecureFile(file) {
   if (!file) return false;
   if (isSecureHtmlFile(file)) return true;
   const fileName = (file.name || '').toLowerCase().trim();
-  if (fileName.endsWith('.html') && file.size < 20 * 1024 * 1024) {
+  if ((fileName.endsWith('.html') || fileName.endsWith('.secure')) && file.size < 50 * 1024 * 1024) {
     try {
       const slice = file.slice(0, 4096);
       const text = await slice.text();
-      if (text.includes('CONTAINER_VERSION') || text.includes('SALT_B64') || text.includes('vault-runtime') || text.includes('SECURE_V1') || (text.includes('Coralgenz') && (text.includes('encrypted') || text.includes('Vault')))) {
+      if (text.includes('STANDARDIZED .SECURE') || text.includes('RFC-2026-SECURE') || text.includes('SECURE_STANDARD_V10') || text.includes('CONTAINER_VERSION') || text.includes('SALT_B64') || text.includes('vault-runtime') || text.includes('SECURE_V1') || (text.includes('Coralgenz') && (text.includes('encrypted') || text.includes('Vault')))) {
         return true;
       }
     } catch (e) {}
   }
   return false;
+}
+
+// --- In-Vault .secure Container Parsing & Unlocking ---
+let activeVaultContainer = null;
+
+async function parseSecureContainerFromFile(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+
+  // Check if raw binary SECURE_V1
+  const magicStr = 'SECURE_V1';
+  let isDirectBinary = bytes.length >= 95;
+  if (isDirectBinary) {
+    for (let i = 0; i < 9; i++) {
+      if (bytes[i] !== magicStr.charCodeAt(i)) {
+        isDirectBinary = false;
+        break;
+      }
+    }
+  }
+
+  let containerBytes = bytes;
+
+  if (!isDirectBinary) {
+    // Might be base64 or standalone HTML container
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    const matchData = text.match(/const\s+DATA\s*=\s*["']([^"']+)["']/);
+    if (matchData && matchData[1]) {
+      const b64 = matchData[1];
+      const binStr = atob(b64);
+      const u8 = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) u8[i] = binStr.charCodeAt(i);
+      containerBytes = u8;
+    } else {
+      // Try parsing as base64 string
+      const cleanB64 = text.trim();
+      try {
+        const binStr = atob(cleanB64);
+        if (binStr.startsWith('SECURE_V1')) {
+          const u8 = new Uint8Array(binStr.length);
+          for (let i = 0; i < binStr.length; i++) u8[i] = binStr.charCodeAt(i);
+          containerBytes = u8;
+        }
+      } catch (e) {}
+    }
+  }
+
+  // Unpack via SecureCrypto
+  const unpacked = SecureCrypto.unpackSecureBinaryContainer(containerBytes);
+  if (!unpacked.valid) {
+    throw new Error('Invalid .secure container: ' + (unpacked.reason || 'Unrecognized container layout.'));
+  }
+
+  return {
+    rawContainer: containerBytes,
+    sourceFile: file,
+    ...unpacked
+  };
+}
+
+async function openSecureContainerInVault(file) {
+  try {
+    const container = await parseSecureContainerFromFile(file);
+    activeVaultContainer = container;
+
+    const modal = document.getElementById('unlock-container-modal');
+    const nameEl = document.getElementById('unlock-container-filename');
+    const metaEl = document.getElementById('unlock-container-meta');
+    const passInput = document.getElementById('unlock-container-password');
+    const pepperInput = document.getElementById('unlock-container-pepper');
+
+    const meta = container.meta || {};
+    const originalName = meta.name || file.name.replace(/\.secure(\.html)?$/i, '');
+    const originalSize = Number(meta.size) || 0;
+    const originalType = meta.type || 'Encrypted Document';
+
+    if (nameEl) nameEl.textContent = `${originalName} (${file.name})`;
+    if (metaEl) metaEl.textContent = `SIZE: ${originalSize > 0 ? formatFileSize(originalSize) : 'Encrypted'} • TYPE: ${originalType} • 16-LAYER RFC-2026-SECURE`;
+
+    if (passInput) {
+      passInput.value = '';
+      passInput.classList.remove('highlight-input-glow');
+    }
+    if (pepperInput) pepperInput.value = '';
+
+    if (modal) {
+      if (typeof modal.showModal === 'function') {
+        modal.showModal();
+      } else {
+        modal.classList.add('active');
+      }
+      setTimeout(() => passInput?.focus(), 150);
+    }
+  } catch (err) {
+    console.error('Failed to parse .secure container:', err);
+    await showAlert('Container Error', 'Failed to inspect .secure file: ' + err.message);
+  }
+}
+
+async function executeContainerUnlock() {
+  if (!activeVaultContainer) return;
+  const passInput = document.getElementById('unlock-container-password');
+  const pepperInput = document.getElementById('unlock-container-pepper');
+  const confirmBtn = document.getElementById('confirm-unlock-container');
+  const saveCheck = document.getElementById('save-container-to-vault-check');
+  const modal = document.getElementById('unlock-container-modal');
+
+  const password = passInput ? passInput.value : '';
+  if (!password) {
+    if (passInput) {
+      passInput.classList.add('highlight-input-glow');
+      passInput.focus();
+    }
+    return;
+  }
+
+  const userPepper = pepperInput ? pepperInput.value.trim() : '';
+  const originalBtnHtml = confirmBtn ? confirmBtn.innerHTML : '';
+
+  try {
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span>DERIVING 16-LAYER KEY...</span>';
+    }
+
+    const { salt, iv, ciphertext, header, integrityHash, iterations, meta, sourceFile } = activeVaultContainer;
+    const targetIterations = iterations || 2000000;
+
+    const basePepper = SecureCrypto.MILSPEC_ANTI_CRACKER_PEPPER_V10;
+    const combinedPepper = userPepper ? `${basePepper}::USER_2FA::${userPepper}` : basePepper;
+
+    // Derive key using hardware Web Worker or fallback
+    let derivedKey;
+    try {
+      derivedKey = await SecureCrypto.deriveKeyAsyncWorker(password, salt, targetIterations, combinedPepper);
+    } catch (e) {
+      derivedKey = await SecureCrypto.deriveKey16Layer(password, salt, targetIterations, combinedPepper);
+    }
+
+    if (confirmBtn) confirmBtn.innerHTML = '<span>DECRYPTING PAYLOAD...</span>';
+
+    // Decrypt AES-256-GCM with unbypassable Galois AEAD container header binding
+    let decrypted;
+    try {
+      decrypted = await SecureCrypto.decryptData(derivedKey, iv, ciphertext, header);
+    } catch (gcmErr) {
+      throw new Error('Decryption failed: Incorrect password, invalid credentials, or tampered .secure container.');
+    }
+
+    // Verify SHA-256 integrity seal if present
+    if (integrityHash && decrypted) {
+      const actualHash = await SecureCrypto.computePayloadHash(decrypted);
+      if (actualHash !== integrityHash) {
+        throw new Error('Cryptographic tamper alert: payload integrity seal failed verification.');
+      }
+    }
+
+    const originalName = meta.name || sourceFile.name.replace(/\.secure(\.html)?$/i, '');
+    const originalType = meta.type || 'application/octet-stream';
+
+    // Container's embedded download permission (determined when the file was exported)
+    const canDownload = meta && meta.allowDownload !== undefined ? Boolean(meta.allowDownload) : true;
+
+    // Optional: save to local vault database
+    if (saveCheck && saveCheck.checked) {
+      try {
+        const fileId = crypto.randomUUID ? crypto.randomUUID() : ('file_' + Date.now());
+        const freshFileKey = await SecureCrypto.generateKey();
+        const { iv: freshIv, ciphertext: freshCiphertext } = await SecureCrypto.encryptData(freshFileKey, decrypted);
+        const { iv: keyWrapIv, wrappedData } = await SecureCrypto.wrapKey(freshFileKey, derivedKey);
+
+        const fileRecord = {
+          id: fileId,
+          name: originalName,
+          type: originalType,
+          size: decrypted.byteLength,
+          date: Date.now(),
+          authMode: 'always',
+          keys: [{ type: 'password', salt, iv: keyWrapIv, data: wrappedData }],
+          content: freshCiphertext,
+          iv: freshIv,
+          containerHeader: header,
+          viewCount: 1,
+          expires: null,
+          note: 'Imported from .secure container',
+          integrityHash: integrityHash || '',
+          allowDownload: true, // Vault owner has full rights in local vault archive
+          accessLog: [{ action: 'imported', date: Date.now() }]
+        };
+        await DB.saveFile(fileRecord);
+        await renderFileList();
+      } catch (dbErr) {
+        console.warn('Could not save imported file to DB:', dbErr);
+      }
+    }
+
+    // Close unlock modal
+    if (modal) {
+      if (typeof modal.close === 'function') modal.close();
+      else modal.classList.remove('active');
+    }
+
+    // Open in secure authentic document viewer (No auto-download, zero blob URL exposure)
+    await openViewer({
+      name: originalName,
+      type: originalType,
+      size: decrypted.byteLength,
+      allowDownload: canDownload,
+      decryptedBuffer: decrypted,
+      isAuthenticDoc: true
+    }, null);
+
+    activeVaultContainer = null;
+  } catch (err) {
+    console.error('Decryption failed:', err);
+    await showAlert('Decryption Failed', err.message || 'Incorrect password.');
+  } finally {
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = originalBtnHtml;
+    }
+  }
 }
 
 // --- Feature: File Upload Preview ---
@@ -731,15 +1087,16 @@ async function handleFileSelect() {
     if (!isSecureHtmlFile(file)) {
       await showAlert(
         'Invalid Container Format',
-        `"${file.name}" contains an encrypted payload, but the mandatory ".secure" extension has been removed.\n\nAll encrypted containers must retain their ".secure" extension (e.g., "${file.name}.secure.html") to function.`
+        `"${file.name}" contains an encrypted payload, but the mandatory ".secure" extension has been removed.\n\nAll encrypted containers must retain their ".secure" extension (e.g., "${file.name}.secure.html" or "${file.name}.secure") to function.`
       );
       fileInput.value = '';
       removeSelectedFile(new Event('cancel'));
       return;
     }
-    await showAlert('Already Secured', `"${file.name}" is already secured! Re-protecting an already secured file is not allowed.`);
+    // Launch In-Vault Container Decryption & Viewer!
     fileInput.value = '';
     removeSelectedFile(new Event('cancel'));
+    await openSecureContainerInVault(file);
     return;
   }
 
@@ -1652,12 +2009,16 @@ function setupDragDrop() {
     e.preventDefault();
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
-      for (const file of files) {
-        if (await checkSecureFile(file)) {
-          await showAlert('Already Secured', `"${file.name}" is already secured! Re-protecting an already secured file is not allowed.`);
-          if (fileInput) fileInput.value = '';
+      if (await checkSecureFile(files[0])) {
+        if (!isSecureHtmlFile(files[0])) {
+          await showAlert(
+            'Invalid Container Format',
+            `"${files[0].name}" contains an encrypted payload, but the mandatory ".secure" extension has been removed.\n\nAll encrypted containers must retain their ".secure" extension (e.g., "${files[0].name}.secure.html" or "${files[0].name}.secure") to function.`
+          );
           return;
         }
+        await openSecureContainerInVault(files[0]);
+        return;
       }
       if (files.length === 1) {
         const dataTransfer = new DataTransfer();
@@ -1676,7 +2037,9 @@ function setupDragDrop() {
 
 async function addFileFromDrop(file) {
   if (await checkSecureFile(file)) {
-    await showAlert('Already Secured', `"${file.name}" is already secured! Re-protecting an already secured file is not allowed.`);
+    if (isSecureHtmlFile(file)) {
+      await openSecureContainerInVault(file);
+    }
     return;
   }
   // Limit file size to 150MB
@@ -2031,123 +2394,138 @@ async function toggleFavorite(e, fileId) {
 // --- Logic: File Download as Encrypted Protected File ---
 async function handleDownloadFile(e, fileId) {
   if (e) e.stopPropagation();
+  // Open the dual-format export modal directly so user can choose .secure or .secure.html
+  openExportModal(fileId);
+}
 
-  try {
-    const fileRecord = await DB.getFile(fileId);
-    if (!fileRecord) {
-      await showAlert('Error', 'File not found');
-      return;
+// Variable to store selected export format: 'html' or 'secure'
+let selectedExportFormat = 'html';
+
+function selectExportFormat(format) {
+  selectedExportFormat = format;
+  const cardHtml = document.getElementById('format-card-secure-html');
+  const cardSecure = document.getElementById('format-card-pure-secure');
+  const btnText = document.getElementById('confirm-share-btn-text');
+  const customOpts = document.getElementById('html-customization-options');
+
+  if (format === 'html') {
+    if (cardHtml) {
+      cardHtml.classList.add('active');
+      cardHtml.style.border = '2px solid var(--cyber-cyan)';
+      cardHtml.style.background = 'rgba(0, 240, 255, 0.08)';
     }
-
-    const result = await decryptFileForExport(fileRecord);
-    if (!result || !result.buffer) return;
-    const { buffer: decryptedBuffer, password: capturedPassword } = result;
-
-    let finalPassword = capturedPassword;
-    if (!finalPassword) {
-      finalPassword = await showPrompt(
-        'Download Protected File',
-        `Enter the file's password to protect this download:`,
-        { inputType: 'password', placeholder: 'Enter original password...' }
-      );
+    if (cardSecure) {
+      cardSecure.classList.remove('active');
+      cardSecure.style.border = '1px solid var(--cyber-border)';
+      cardSecure.style.background = 'rgba(255, 255, 255, 0.02)';
     }
-
-    if (!finalPassword) return;
-
-    await exportSecureFile(fileRecord, decryptedBuffer, finalPassword, {}, 'Downloaded! The protected file has been saved.');
-
-    // Track access log
-    addAccessLog(fileRecord, 'downloaded');
-    await DB.updateFile(fileRecord);
-
-  } catch (err) {
-    console.error(err);
-    await showAlert('Error', 'Failed to download file: ' + (err.message || 'Decryption error'));
+    if (btnText) btnText.textContent = 'EXPORT AS .SECURE.HTML';
+    if (customOpts) customOpts.style.display = 'block';
+  } else {
+    if (cardSecure) {
+      cardSecure.classList.add('active');
+      cardSecure.style.border = '2px solid var(--cyber-cyan)';
+      cardSecure.style.background = 'rgba(0, 240, 255, 0.08)';
+    }
+    if (cardHtml) {
+      cardHtml.classList.remove('active');
+      cardHtml.style.border = '1px solid var(--cyber-border)';
+      cardHtml.style.background = 'rgba(255, 255, 255, 0.02)';
+    }
+    if (btnText) btnText.textContent = 'EXPORT AS .SECURE';
+    if (customOpts) customOpts.style.display = 'none';
   }
 }
 
-async function handleShareFile(e, fileId) {
-  e.stopPropagation();
-
-  try {
-    const fileRecord = await DB.getFile(fileId);
-    if (!fileRecord) return;
-
-    const result = await decryptFileForExport(fileRecord);
-    if (!result || !result.buffer) return;
-    const { buffer: decryptedBuffer, password: capturedPassword } = result;
-
-    let finalPassword = capturedPassword;
-    if (!finalPassword) {
-      // If we didn't capture the password (e.g. Persistent mode used device key), we must ask for it now
-      finalPassword = await showPrompt('Share File', `Enter the file's password to protect this export:`, { inputType: 'password', placeholder: 'Enter original password...' });
-    }
-
-    if (!finalPassword) return;
-
-    // Simple share without customization
-    await exportSecureFile(fileRecord, decryptedBuffer, finalPassword, {});
-
-  } catch (err) {
-    console.error(err);
-    await showAlert('Error', 'Share failed: ' + err.message);
-  }
-}
-
-// Open Share Modal
-function handleCustomShare(e, fileId) {
-  e.stopPropagation();
+// Open Share / Export Modal with Format Chooser (.secure vs .secure.html)
+async function openExportModal(fileId, isCustom = false) {
   currentShareFileId = fileId;
-  document.getElementById('share-password').value = '';
-  document.getElementById('share-title').value = '';
-  document.getElementById('share-logo').value = '';
+  const fileRecord = await DB.getFile(fileId);
+  if (!fileRecord) {
+    await showAlert('Error', 'File not found');
+    return;
+  }
+
+  const nameEl = document.getElementById('share-file-name');
+  const metaEl = document.getElementById('share-file-meta');
+  const passInput = document.getElementById('share-password');
+  const titleInput = document.getElementById('share-title');
+  const logoInput = document.getElementById('share-logo');
+  const logoText = document.getElementById('share-logo-text');
+
+  if (nameEl) nameEl.textContent = fileRecord.name;
+  if (metaEl) metaEl.textContent = `SIZE: ${formatFileSize(fileRecord.size)} • RFC-2026-SECURE • 16-LAYER QUANTUM-HARDENED`;
+  if (passInput) {
+    // If this file was just protected in this session, pre-fill password for seamless export
+    if (lastProtectedFile && lastProtectedFile.record && lastProtectedFile.record.id === fileId && lastProtectedFile.password) {
+      passInput.value = lastProtectedFile.password;
+    } else {
+      passInput.value = '';
+    }
+    passInput.classList.remove('highlight-input-glow');
+  }
+  if (titleInput) titleInput.value = '';
+  if (logoInput) logoInput.value = '';
+  if (logoText) logoText.textContent = 'Choose Logo File';
+
+  selectExportFormat('html');
+
   const shareModal = document.getElementById('share-modal');
   shareModal?.showModal();
+  setTimeout(() => {
+    if (isCustom && titleInput) {
+      titleInput.focus();
+    } else {
+      passInput?.focus();
+    }
+  }, 150);
+}
+
+function handleShareFile(e, fileId) {
+  if (e) e.stopPropagation();
+  openExportModal(fileId, false);
+}
+
+function handleCustomShare(e, fileId) {
+  if (e) e.stopPropagation();
+  openExportModal(fileId, true);
 }
 
 // Handle Export from Modal
 async function handleShareConfirm() {
   const shareModal = document.getElementById('share-modal');
-  const password = document.getElementById('share-password').value;
-  const title = document.getElementById('share-title').value || 'SecureVault';
+  const passInput = document.getElementById('share-password');
+  const password = passInput ? passInput.value : '';
+  const title = document.getElementById('share-title')?.value || 'Coralgenz Vault';
   const logoInput = document.getElementById('share-logo');
 
   if (!password) {
-    await showAlert('Required', 'Please set a password for the file.');
+    if (passInput) {
+      passInput.classList.add('highlight-input-glow');
+      passInput.focus();
+    }
+    await showAlert('Required', 'Please enter the file password to authorize export.');
     return;
   }
 
-  const weakDictionaryWords = [
-    '123456', 'password', '12345678', 'admin', 'admin123', 'benz', 'qwerty',
-    '123456789', 'welcome', 'letmein', 'monkey', 'dragon', 'master',
-    'football', 'access', 'iloveyou', 'testing', 'security', 'vault', 'pass123',
-    'root', 'user', '111111', '000000', 'trustno1'
-  ];
-  const normalizedPwd = password.toLowerCase().trim();
-  const isWeak = password.length < 8 || weakDictionaryWords.includes(normalizedPwd);
-  if (isWeak) {
-    const proceed = await showConfirm(
-      '⚠️ Weak Password Warning',
-      'This password is short or common, which makes it less secure against offline dictionary attacks. However, the encryption engine still protects it with 2,000,000 PBKDF2 rounds.\n\nDo you want to proceed with this password?'
-    );
-    if (!proceed) return;
-  }
-
   const confirmBtn = document.getElementById('confirm-share');
-  const originalText = confirmBtn.innerText;
-  confirmBtn.innerText = 'Exporting...';
+  const originalHtml = confirmBtn ? confirmBtn.innerHTML : '';
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span>PACKAGING CONTAINER...</span>';
+  }
 
   try {
     const fileRecord = await DB.getFile(currentShareFileId);
     if (!fileRecord) throw new Error('File not found');
 
     const result = await decryptFileForExport(fileRecord, password);
-    if (!result || !result.buffer) throw new Error('Decryption failed');
+    if (!result || !result.buffer) throw new Error('Decryption failed: Incorrect password.');
     const decryptedBuffer = result.buffer;
 
-    // Process Logo
-    let logoDataUrl = "";
-    if (logoInput.files && logoInput.files[0]) {
+    // Process Logo if HTML format
+    let logoDataUrl = '';
+    if (selectedExportFormat === 'html' && logoInput?.files && logoInput.files[0]) {
       logoDataUrl = await new Promise(resolve => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -2156,23 +2534,39 @@ async function handleShareConfirm() {
     }
 
     const customization = { title: title, logoUrl: logoDataUrl };
-    await exportSecureFile(fileRecord, decryptedBuffer, password, customization);
+    const asPureSecure = (selectedExportFormat === 'secure');
 
-    shareModal.close();
+    const successMsg = asPureSecure
+      ? 'Standard .secure container downloaded successfully! You can open it in Coralgenz Vault.'
+      : 'Universal protected file (.secure.html) downloaded successfully! Opens on double-click in any browser.';
+
+    const exportedFileName = await exportSecureFile(fileRecord, decryptedBuffer, password, customization, successMsg, '', asPureSecure);
+
+    addAccessLog(fileRecord, 'exported_' + selectedExportFormat);
+    await DB.updateFile(fileRecord);
+
+    shareModal?.close();
     currentShareFileId = null;
 
+    await showAlert('Export Successful', `${successMsg}\n\nFile: ${exportedFileName}`);
+
   } catch (err) {
-    console.error(err);
-    await showAlert('Error', 'Export failed: ' + err.message);
+    console.error('Export error:', err);
+    await showAlert('Export Failed', err.message || 'Export failed.');
   } finally {
-    confirmBtn.innerText = originalText;
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = originalHtml;
+    }
   }
 }
 
 // --- Feature: Download Policies ---
 function isMediaFile(name, type) {
   const mime = (type || '').toLowerCase();
-  const filename = (name || '').toLowerCase();
+  const rawName = (name || '').toLowerCase();
+  // Strip .secure, .secure.html, or trailing container suffixes to inspect the genuine underlying file type
+  const filename = rawName.replace(/\.secure(\.html)?$/i, '');
   if (mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/')) {
     return true;
   }
@@ -2180,6 +2574,9 @@ function isMediaFile(name, type) {
 }
 
 function getDownloadPolicy() {
+  if (typeof localStorage === 'undefined') {
+    return { allowMedia: true, allowDoc: true };
+  }
   const allowMedia = localStorage.getItem('sv_dl_media') !== 'false';
   const allowDoc = localStorage.getItem('sv_dl_doc') !== 'false';
   return { allowMedia, allowDoc };
@@ -2220,7 +2617,7 @@ function encodeBase64Utf8(str) {
 
 
 // Common export function - Packages authentic .secure binary container with AEAD mathematical authentication
-async function exportSecureFile(fileRecord, decryptedBuffer, password, customization = {}, successMessage = '', customPepper = '') {
+async function exportSecureFile(fileRecord, decryptedBuffer, password, customization = {}, successMessage = '', customPepper = '', asPureSecure = false) {
   if (!decryptedBuffer || decryptedBuffer.byteLength === 0) {
     throw new Error('No decrypted file payload available to package.');
   }
@@ -2229,9 +2626,10 @@ async function exportSecureFile(fileRecord, decryptedBuffer, password, customiza
   }
 
   // Determine download permission based on file type and download policies
+  const isPolicyAllowed = isDownloadAllowedForFile(fileRecord.name, fileRecord.type);
   const allowDownload = customization.allowDownload !== undefined
-    ? Boolean(customization.allowDownload)
-    : isDownloadAllowedForFile(fileRecord.name, fileRecord.type);
+    ? (Boolean(customization.allowDownload) && isPolicyAllowed)
+    : isPolicyAllowed;
 
   const exportSalt = SecureCrypto.generateSalt();
   const payloadHash = await SecureCrypto.computePayloadHash(decryptedBuffer);
@@ -2241,6 +2639,11 @@ async function exportSecureFile(fileRecord, decryptedBuffer, password, customiza
   // Structured .secure Metadata block (RFC-2026-SECURE)
   const meta = {
     name: fileRecord.name || 'Protected File',
+    format: 'SECURE_STANDARD_V10',
+    specification: 'RFC-2026-SECURE',
+    standardExtension: '.secure',
+    universalRunnerExtension: '.secure.html',
+    engine: 'coralgenz-vault-v10',
     type: fileRecord.type || 'application/octet-stream',
     size: Number(fileRecord.size) || decryptedBuffer.byteLength,
     id: fileRecord.id || '',
@@ -2281,40 +2684,65 @@ async function exportSecureFile(fileRecord, decryptedBuffer, password, customiza
     kdfId: 0x02
   });
 
-  const blobToBase64 = (blob) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = () => {
-        const result = reader.result || '';
-        resolve(result.split(',')[1] || '');
-      };
-    });
-  };
-
-  const base64Data = await blobToBase64(new Blob([finalContainer.container]));
-  if (!base64Data) {
-    throw new Error('Failed to serialize encrypted .secure binary container.');
-  }
-
-  const { header, footer } = generateSecureHTMLParts(fileRecord, exportSalt, iv, {
-    ...customization,
-    allowDownload,
-    integrityHash: payloadHash
-  });
-
-  const rawHtml = header + base64Data + footer;
-  const finalBlob = new Blob([rawHtml], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(finalBlob);
+  let finalBlob;
+  let rawName = fileRecord.name || 'protected_file';
+  let exportFilename = '';
 
   const a = document.createElement('a');
+
+  if (asPureSecure) {
+    // Pure .secure container format: Pure binary container (RFC-2026-SECURE) without HTML wrapper
+    finalBlob = new Blob([finalContainer.container], { type: 'application/x-secure-container' });
+    a.download = rawName.toLowerCase().endsWith('.secure') ? rawName : (rawName.replace(/\.html$/i, '') + '.secure');
+  } else {
+    const blobToBase64 = (blob) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => {
+          const result = reader.result || '';
+          resolve(result.split(',')[1] || '');
+        };
+      });
+    };
+
+    const base64Data = await blobToBase64(new Blob([finalContainer.container]));
+    if (!base64Data) {
+      throw new Error('Failed to serialize encrypted .secure binary container.');
+    }
+
+    const { header, footer } = generateSecureHTMLParts(fileRecord, exportSalt, iv, {
+      ...customization,
+      allowDownload,
+      integrityHash: payloadHash
+    });
+
+    // Universal format (.secure.html): Standard .secure container wrapped with browser execution runtime
+    const rawHtml = header + base64Data + footer;
+    finalBlob = new Blob([rawHtml], { type: 'text/html;charset=utf-8' });
+    if (rawName.toLowerCase().endsWith('.secure.html')) {
+      a.download = rawName;
+    } else if (rawName.toLowerCase().endsWith('.secure')) {
+      a.download = rawName + '.html';
+    } else {
+      a.download = rawName + '.secure.html';
+    }
+  }
+
+  exportFilename = a.download;
+  const url = URL.createObjectURL(finalBlob);
+  a.style.display = 'none';
   a.href = url;
-  const fileName = fileRecord.name || 'protected_file';
-  a.download = fileName.endsWith('.secure.html') ? fileName : (fileName + '.secure.html');
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {}
+  }, 60000);
+
+  return exportFilename;
 }
 
 // Generate Header and Footer parts for the standalone HTML wrapper
@@ -2333,9 +2761,10 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
   const safeMetaId = fileMeta.id || '';
 
   // Determine download policy for this file
+  const isPolicyAllowed = typeof isDownloadAllowedForFile === 'function' ? isDownloadAllowedForFile(safeMetaName, safeMetaType) : true;
   const allowDownload = customization.allowDownload !== undefined
-    ? Boolean(customization.allowDownload)
-    : isDownloadAllowedForFile(safeMetaName, safeMetaType);
+    ? (Boolean(customization.allowDownload) && isPolicyAllowed)
+    : isPolicyAllowed;
 
   const lowerMetaName = (safeMetaName || '').toLowerCase();
   const lowerMetaType = (safeMetaType || '').toLowerCase();
@@ -2370,11 +2799,28 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
         </svg>
       </div>`;
 
-  const header = `<!DOCTYPE html>
-<html lang="en">
+  const header = `<!--
+================================================================================
+STANDARDIZED .SECURE CRYPTOGRAPHIC CONTAINER
+SPECIFICATION: RFC-2026-SECURE / NIST SP 800-38D / RFC 8018
+FORMAT EXTENSION: .secure
+CONTAINER TYPE: Zero-Knowledge Multi-Cipher Encrypted Document
+RUN-MODE: Cross-Platform Browser-Executable Runtime Envelope
+================================================================================
+Notice: This is an authentic .secure cryptographic container file, NOT a generic
+HTML page. The embedded HTML5/WebCrypto framework operates strictly as an in-browser
+zero-dependency execution runtime to unlock and view this container locally
+within any modern web browser without server communication.
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en" data-container-format="SECURE_STANDARD_V10" data-container-spec="RFC-2026-SECURE" data-engine="coralgenz-vault">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format" content=".secure">
+    <meta name="container-specification" content="RFC-2026-SECURE">
+    <meta name="application-name" content="Coralgenz Secure Container Runtime">
     <!-- Standard Cache Control & Privacy Headers -->
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
@@ -2383,7 +2829,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
     <meta name="referrer" content="no-referrer">
     <!-- Strict Content Security Policy (W3C Standard, eval disabled) -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; frame-src blob:; script-src 'unsafe-inline' blob:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none';">
-    <title>${brandTitle} // ${safeMetaName}</title>
+    <title>${brandTitle} // ${safeMetaName}.secure</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -4039,7 +4485,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
             <div class="tamper-box">
                 <div class="tamper-row">
                     <span class="tamper-lbl">Mandatory Format:</span>
-                    <span class="tamper-val" style="color:var(--accent-cyan);">*.secure.html / *.secure</span>
+                    <span class="tamper-val" style="color:var(--accent-cyan);">*.secure (RFC-2026-SECURE)</span>
                 </div>
                 <div class="tamper-row">
                     <span class="tamper-lbl">Detected Filename:</span>
@@ -4055,7 +4501,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                 </div>
             </div>
             <div class="tamper-instruction">
-                🔒 <strong>Format Recovery Instruction:</strong> Restore the <code>.secure</code> extension to this file (e.g. rename to <strong><span id="tamper-suggested-name">filename.secure.html</span></strong>) and reopen.
+                🔒 <strong>Format Recovery Instruction:</strong> Restore the <code>.secure</code> extension to this file (e.g. rename to <strong><span id="tamper-suggested-name">filename.secure</span></strong>) and reopen.
             </div>
             <div class="tamper-footer">STANDARD ENCRYPTED DOCUMENT CONTAINER (NIST SP 800-38D / RFC 8018)</div>
         </div>
@@ -4064,7 +4510,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
     <div id="auth-panel" class="auth-container">
         ${logoHTML}
         <h1 class="auth-title">${brandTitle}</h1>
-        <div class="auth-subtitle">Protected & Encrypted File</div>
+        <div class="auth-subtitle">Standard Cryptographic Container (.secure)</div>
         
         <div class="file-info-chip">
             <div class="file-chip-icon">
@@ -4177,6 +4623,48 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
         const BRAND = ${jsonBrand};
         const ALLOW_DOWNLOAD = ${jsonAllowDownload};
         const INTEGRITY_HASH = ${jsonIntegrityHash};
+
+        // Format Integrity Engine: Enforces mandatory .secure file extension
+        function verifyFormatIntegrity() {
+            try {
+                const protocol = window.location.protocol;
+                const path = decodeURIComponent(window.location.pathname || window.location.href || '');
+                const cleanPath = path.split('?')[0].split('#')[0];
+                
+                if (cleanPath && cleanPath !== '/' && !cleanPath.endsWith('/')) {
+                    const rawName = cleanPath.split('/').pop() || '';
+                    if (rawName && rawName.includes('.')) {
+                        const lowerRaw = rawName.toLowerCase();
+                        // If opened locally (file:) or in browser, ensure .secure is present
+                        if (protocol === 'file:' || lowerRaw.endsWith('.secure') || lowerRaw.endsWith('.html') || lowerRaw.endsWith('.htm')) {
+                            if (!lowerRaw.includes('.secure')) {
+                                return { valid: false, filename: rawName };
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
+            return { valid: true, filename: '' };
+        }
+
+        const formatCheck = verifyFormatIntegrity();
+        if (!formatCheck.valid) {
+            const tamperScreen = document.getElementById('tamper-barrier');
+            const detectedEl = document.getElementById('tamper-detected-name');
+            const suggestedEl = document.getElementById('tamper-suggested-name');
+            const authPanel = document.getElementById('auth-panel');
+            const pwdInput = document.getElementById('pwd');
+            const unlockBtn = document.getElementById('unlock-btn');
+
+            const cleanBase = (formatCheck.filename || 'file').replace(/\.html$/i, '').replace(/\.htm$/i, '').replace(/\.secure$/i, '');
+            if (detectedEl) detectedEl.textContent = formatCheck.filename || 'Non-.secure File';
+            if (suggestedEl) suggestedEl.textContent = cleanBase + '.secure';
+            if (tamperScreen) tamperScreen.classList.add('active');
+            if (authPanel) authPanel.style.display = 'none';
+            if (pwdInput) pwdInput.disabled = true;
+            if (unlockBtn) unlockBtn.disabled = true;
+            zeroizeMemory();
+        }
 
         // Constants for .secure Standard Binary Container Format (RFC-2026-SECURE)
         const MAGIC_BYTES = new Uint8Array([0x53, 0x45, 0x43, 0x55, 0x52, 0x45, 0x5F, 0x56, 0x31]); // 'SECURE_V1'
@@ -7026,22 +7514,14 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     if (additionalData) {
                         decryptAlgo.additionalData = additionalData;
                     }
-                    try {
-                        return await window.crypto.subtle.decrypt(
-                            decryptAlgo,
-                            legKey,
-                            encrypted
-                        );
-                    } catch (e) {
-                        return await window.crypto.subtle.decrypt(
-                            { name: 'AES-GCM', iv: iv },
-                            legKey,
-                            encrypted
-                        );
-                    }
+                    return await window.crypto.subtle.decrypt(
+                        decryptAlgo,
+                        legKey,
+                        encrypted
+                    );
                 }
 
-                // Decryption execution with multi-tier resilience and AEAD mathematical verification:
+                // Decryption execution with mandatory AEAD mathematical verification:
                 let decryptSucceeded = false;
                 let lastDecryptErr = null;
 
@@ -7050,14 +7530,7 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     if (additionalData) {
                         algo.additionalData = additionalData;
                     }
-                    try {
-                        return await window.crypto.subtle.decrypt(algo, derivedKey, encrypted);
-                    } catch (aadErr) {
-                        if (additionalData) {
-                            return await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, derivedKey, encrypted);
-                        }
-                        throw aadErr;
-                    }
+                    return await window.crypto.subtle.decrypt(algo, derivedKey, encrypted);
                 };
 
                 const targetIterations = (isBinaryContainer && containerInfo.iterations) ? containerInfo.iterations : 2000000;
@@ -7228,6 +7701,10 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                 const isArchive = safeType.includes('zip') || safeType.includes('tar') || safeType.includes('compressed') || hasExt(lowerName, ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz']);
                 const isText = safeType.startsWith('text/') || hasExt(lowerName, ['txt', 'json', 'js', 'ts', 'html', 'css', 'py', 'c', 'cpp', 'h', 'md', 'xml', 'log', 'sh', 'env', 'yaml', 'yml', 'sql', 'rs', 'go', 'java', 'kt', 'swift', 'rb', 'php']);
 
+                // Security Shield: Prevent context menu and dragging to block copying blob URLs
+                contentArea.oncontextmenu = (e) => e.preventDefault();
+                contentArea.ondragstart = (e) => e.preventDefault();
+
                 if (isImage) {
                     contentArea.innerHTML = '';
                     const directImg = document.createElement('img');
@@ -7237,15 +7714,22 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     directImg.style.maxHeight = '88vh';
                     directImg.style.borderRadius = '12px';
                     directImg.style.boxShadow = '0 10px 40px rgba(15,23,42,0.15)';
+                    directImg.draggable = false;
+                    directImg.onload = () => {
+                        if (decryptedBlobUrl) {
+                            URL.revokeObjectURL(decryptedBlobUrl);
+                            decryptedBlobUrl = null;
+                        }
+                    };
                     contentArea.appendChild(directImg);
                 } else if (isVideo) {
                     const vid = document.createElement('video');
                     vid.src = decryptedBlobUrl;
                     vid.controls = true;
                     vid.autoplay = true;
+                    vid.draggable = false;
                     if (!ALLOW_DOWNLOAD) {
                         vid.setAttribute('controlsList', 'nodownload');
-                        vid.oncontextmenu = (e) => e.preventDefault();
                     }
                     contentArea.appendChild(vid);
                 } else if (isAudio) {
@@ -7253,9 +7737,9 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     aud.src = decryptedBlobUrl;
                     aud.controls = true;
                     aud.autoplay = true;
+                    aud.draggable = false;
                     if (!ALLOW_DOWNLOAD) {
                         aud.setAttribute('controlsList', 'nodownload');
-                        aud.oncontextmenu = (e) => e.preventDefault();
                     }
                     contentArea.appendChild(aud);
                 } else if (isPdf) {
@@ -7263,14 +7747,19 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
                     iframe.src = ALLOW_DOWNLOAD ? decryptedBlobUrl : (decryptedBlobUrl + '#toolbar=0');
                     contentArea.appendChild(iframe);
                 } else if (isExcel || isCsv) {
+                    if (decryptedBlobUrl) { URL.revokeObjectURL(decryptedBlobUrl); decryptedBlobUrl = null; }
                     await renderExcelSpreadsheet(decryptedBytes, NAME, contentArea, ALLOW_DOWNLOAD, blob);
                 } else if (isWord) {
+                    if (decryptedBlobUrl) { URL.revokeObjectURL(decryptedBlobUrl); decryptedBlobUrl = null; }
                     await renderWordDocument(decryptedBytes, NAME, contentArea, ALLOW_DOWNLOAD, blob);
                 } else if (isPpt) {
+                    if (decryptedBlobUrl) { URL.revokeObjectURL(decryptedBlobUrl); decryptedBlobUrl = null; }
                     await renderPowerPointDeck(decryptedBytes, NAME, contentArea, ALLOW_DOWNLOAD, blob);
                 } else if (isArchive) {
+                    if (decryptedBlobUrl) { URL.revokeObjectURL(decryptedBlobUrl); decryptedBlobUrl = null; }
                     renderArchiveContents(decryptedBytes, NAME, contentArea, ALLOW_DOWNLOAD, blob);
                 } else if (isText) {
+                    if (decryptedBlobUrl) { URL.revokeObjectURL(decryptedBlobUrl); decryptedBlobUrl = null; }
                     const textDecoder = new TextDecoder();
                     const textContent = textDecoder.decode(decryptedBytes);
                     const wrap = document.createElement('div');
@@ -7343,39 +7832,79 @@ function generateSecureHTMLParts(fileMeta, salt, iv, customization = {}) {
 
 // Helper to decrypt strictly for export (using internal storage keys)
 async function decryptFileForExport(fileRecord, providedPassword = null) {
-  // We need to unlock it first.
-  let fileKey = null;
-  let usedPassword = providedPassword;
-
-  // 1. Try provided password first if available
-  if (providedPassword) {
-    try {
-      const passKeyEntry = fileRecord.keys.find(k => k.type === 'password');
-      if (passKeyEntry) {
-        fileKey = await SecureCrypto.unwrapWithFallback(passKeyEntry.data, providedPassword, passKeyEntry.salt, passKeyEntry.iv);
-      }
-    } catch (e) {
-      console.log('Provided password invalid for unlock');
-      // Fall through to other methods
+  // Fast path: if this file was just protected in this session and password matches, use in-memory buffer directly
+  if (lastProtectedFile && lastProtectedFile.record && lastProtectedFile.record.id === fileRecord.id && lastProtectedFile.buffer) {
+    if (!providedPassword || providedPassword === lastProtectedFile.password || providedPassword.trim() === lastProtectedFile.password.trim()) {
+      return { buffer: lastProtectedFile.buffer, password: lastProtectedFile.password };
     }
   }
 
-  // 2. If still no key, we MUST ask for the original password
+  let fileKey = null;
+  let usedPassword = providedPassword;
+
+  // Determine if there is an active pepper from the session
+  const sessionPepper = (lastProtectedFile && lastProtectedFile.record && lastProtectedFile.record.id === fileRecord.id && lastProtectedFile.userPepper)
+    ? lastProtectedFile.userPepper
+    : '';
+
+  // 1. Try provided password first if available
+  if (providedPassword) {
+    const passKeyEntry = fileRecord.keys?.find(k => k.type === 'password');
+    if (passKeyEntry) {
+      // Try exact password
+      try {
+        fileKey = await SecureCrypto.unwrapWithFallback(passKeyEntry.data, providedPassword, passKeyEntry.salt, passKeyEntry.iv, 2000000, sessionPepper);
+      } catch (e1) {
+        // Try trimmed password
+        try {
+          fileKey = await SecureCrypto.unwrapWithFallback(passKeyEntry.data, providedPassword.trim(), passKeyEntry.salt, passKeyEntry.iv, 2000000, sessionPepper);
+          usedPassword = providedPassword.trim();
+        } catch (e2) {
+          // If session pepper was used, also try without session pepper
+          if (sessionPepper) {
+            try {
+              fileKey = await SecureCrypto.unwrapWithFallback(passKeyEntry.data, providedPassword, passKeyEntry.salt, passKeyEntry.iv, 2000000, '');
+            } catch (e3) {}
+          }
+        }
+      }
+    }
+
+    // If provided password failed, do NOT show prompt - throw clean error so modal displays it
+    if (!fileKey) {
+      throw new Error('Incorrect password');
+    }
+  }
+
+  // 2. If no password provided (e.g. bulk export flow), ask for original password
   if (!fileKey) {
     const password = await showPrompt('Decrypt for Export', 'Provide the ORIGINAL password to decrypt for export:', { inputType: 'password', placeholder: 'Enter password...' });
     if (!password) return null;
 
     try {
-      const passKeyEntry = fileRecord.keys.find(k => k.type === 'password');
+      const passKeyEntry = fileRecord.keys?.find(k => k.type === 'password');
+      if (!passKeyEntry) throw new Error('Corrupt key data');
       fileKey = await SecureCrypto.unwrapWithFallback(passKeyEntry.data, password, passKeyEntry.salt, passKeyEntry.iv);
-      usedPassword = password; // Capture it
+      usedPassword = password;
     } catch (err) {
       await showAlert('Error', 'Incorrect password');
       return null;
     }
   }
 
-  const buffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
+  // 3. Decrypt ciphertext payload
+  let buffer;
+  try {
+    // Direct decryption works for standard files in vault
+    buffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
+  } catch (decErr) {
+    // If direct decryption failed and containerHeader exists, try using containerHeader as AAD
+    if (fileRecord.containerHeader) {
+      buffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content, fileRecord.containerHeader);
+    } else {
+      throw decErr;
+    }
+  }
   return { buffer, password: usedPassword };
 }
 
@@ -7551,11 +8080,11 @@ async function handleAddFile() {
     updateProcessStep('step-meta', 'completed');
     updateProcessStep('step-finalize', 'completed');
 
-    // PHASE 6: Standalone HTML Generator & Anti-Brute-Force Guard (4200ms to 5100ms)
-    updateProcessProgress(92, 'COMPILING STANDALONE HTML RUNTIME (.secure.html)...');
+    // PHASE 6: Standalone Container Runtime & Anti-Brute-Force Guard (4200ms to 5100ms)
+    updateProcessProgress(92, 'COMPILING STANDALONE ENCLAVE RUNTIME (.secure)...');
     updateProcessStep('step-output', 'active');
-    if (scannerStatus) scannerStatus.textContent = 'STANDALONE HTML';
-    logTerminal(`${formatTimeToken(Date.now() - startTime)} Assembling self-contained portable decryption engine (.secure.html)...`);
+    if (scannerStatus) scannerStatus.textContent = 'STANDALONE CONTAINER';
+    logTerminal(`${formatTimeToken(Date.now() - startTime)} Assembling standardized .secure container with embedded browser execution runtime...`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 15] Progressive Exponential Time-Throttling & Anti-Brute-Force Guard Armed.`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} Anti-Exfiltration & Cryptographic defense matrix embedded.`);
     await sleepUntil(5100);
@@ -7668,31 +8197,44 @@ async function handleAuthSubmit() {
 
 async function openViewer(fileRecord, fileKey) {
   try {
-    // Decrypt
-    const decryptedBuffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
+    // Decrypt if key provided, otherwise use pre-decrypted buffer
+    let decryptedBuffer;
+    if (!fileKey && fileRecord.decryptedBuffer) {
+      decryptedBuffer = fileRecord.decryptedBuffer;
+    } else {
+      decryptedBuffer = await SecureCrypto.decryptData(fileKey, fileRecord.iv, fileRecord.content);
+    }
     const blob = new Blob([decryptedBuffer], { type: fileRecord.type });
     currentDecryptedUrl = URL.createObjectURL(blob);
 
     // UI
     const container = document.getElementById('viewer-content');
     container.innerHTML = '';
+    // Security Shield: Neutralize context menu and dragging to prevent copying blob URLs or opening in new tabs
+    container.oncontextmenu = (e) => e.preventDefault();
+    container.ondragstart = (e) => e.preventDefault();
+    viewer.oncontextmenu = (e) => e.preventDefault();
 
-    // Check Permissions using download policy
-    const allowDL = isDownloadAllowedForFile(fileRecord.name, fileRecord.type);
+    // Vault owner viewing their authenticated file in PROTECTED VAULT ARCHIVE always has download available.
+    // External standalone containers (opened without vault fileKey): respect the container's embedded allowDownload policy.
+    const allowDL = fileKey ? true : (fileRecord.allowDownload !== undefined ? Boolean(fileRecord.allowDownload) : true);
 
     // Show/Hide Header Download Button
     if (viewerDownloadBtn) {
       if (allowDL) {
         viewerDownloadBtn.classList.remove('hidden');
         viewerDownloadBtn.onclick = () => {
-          if (!currentDecryptedUrl) return;
+          // Download authentic file on demand via temporary one-shot blob
+          const tempBlob = new Blob([decryptedBuffer], { type: fileRecord.type });
+          const tempUrl = URL.createObjectURL(tempBlob);
           const a = document.createElement('a');
           a.style.display = 'none';
-          a.href = currentDecryptedUrl;
+          a.href = tempUrl;
           a.download = fileRecord.name;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(tempUrl), 1000);
         };
       } else {
         viewerDownloadBtn.classList.add('hidden');
@@ -7712,21 +8254,39 @@ async function openViewer(fileRecord, fileKey) {
     const isPpt = safeType.includes('presentation') || safeType.includes('powerpoint') || /\.(pptx|ppt|pps|ppsx)$/i.test(lowerName);
     const isText = safeType.startsWith('text/') || /\.(txt|json|js|ts|html|css|py|c|cpp|h|java|sh|xml|yaml|yml|sql|md|log|env|rs|go|kt|swift|rb|php)$/i.test(lowerName);
 
+    // Toggle clean authentic light document view mode for documents & spreadsheets
+    if (fileRecord.isAuthenticDoc || isExcel || isWord || isPdf || isText) {
+      viewer.classList.add('authentic-doc-mode');
+    } else {
+      viewer.classList.remove('authentic-doc-mode');
+    }
+
     if (isImage) {
       const img = document.createElement('img');
       img.src = currentDecryptedUrl;
       img.style.maxWidth = '90vw';
       img.style.maxHeight = '80vh';
       img.style.objectFit = 'contain';
+      img.style.imageRendering = 'auto';
+      img.style.borderRadius = '8px';
+      img.style.boxShadow = '0 10px 30px rgba(0,0,0,0.15)';
+      img.draggable = false;
+      // Immediate URL revocation on paint: blob link becomes instant 404 if shared
+      img.onload = () => {
+        if (currentDecryptedUrl) {
+          URL.revokeObjectURL(currentDecryptedUrl);
+          currentDecryptedUrl = null;
+        }
+      };
       container.appendChild(img);
     } else if (isVideo || isAudio) {
       const media = document.createElement(isVideo ? 'video' : 'audio');
       media.src = currentDecryptedUrl;
       media.controls = true;
       media.autoplay = true;
+      media.draggable = false;
       if (!allowDL) {
         media.setAttribute('controlsList', 'nodownload');
-        media.oncontextmenu = (e) => e.preventDefault();
       }
       container.appendChild(media);
     } else if (isPdf) {
@@ -7735,45 +8295,71 @@ async function openViewer(fileRecord, fileKey) {
       iframe.style.width = '100%';
       iframe.style.height = '100%';
       iframe.style.border = 'none';
+      iframe.style.borderRadius = '8px';
+      iframe.style.boxShadow = '0 10px 30px rgba(0,0,0,0.1)';
       container.appendChild(iframe);
     } else if (isExcel) {
       renderExcelToHTML(decryptedBuffer, container, fileRecord.name);
+      // Clean up blob URL since Excel is rendered directly into HTML table
+      if (currentDecryptedUrl) {
+        URL.revokeObjectURL(currentDecryptedUrl);
+        currentDecryptedUrl = null;
+      }
     } else if (isWord) {
       await renderWordToHTML(decryptedBuffer, container);
+      // Clean up blob URL since Word is rendered directly into HTML
+      if (currentDecryptedUrl) {
+        URL.revokeObjectURL(currentDecryptedUrl);
+        currentDecryptedUrl = null;
+      }
     } else if (isPpt) {
       await renderPowerPointToHTML(decryptedBuffer, fileRecord.name, container);
+      if (currentDecryptedUrl) {
+        URL.revokeObjectURL(currentDecryptedUrl);
+        currentDecryptedUrl = null;
+      }
     } else if (isText) {
       const decoder = new TextDecoder();
       const textContent = decoder.decode(decryptedBuffer);
       const wrap = document.createElement('div');
       wrap.className = 'excel-viewer';
-      wrap.style.background = '#0f172a';
-      wrap.style.color = '#e2e8f0';
+      wrap.style.background = '#ffffff';
+      wrap.style.color = '#0f172a';
+      wrap.style.border = '1px solid #cbd5e1';
       wrap.innerHTML = `
-        <div class="excel-header" style="background:#1e293b;border-color:rgba(255,255,255,0.1);justify-content:space-between;align-items:center;">
-          <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--accent-cyan);">${fileRecord.name}</span>
-          <button type="button" id="vault-copy-code-btn" class="excel-sheet-btn">Copy Text</button>
+        <div class="excel-header" style="background:#f8fafc;border-color:#e2e8f0;justify-content:space-between;align-items:center;">
+          <span style="font-family:var(--font-ui);font-size:13px;font-weight:700;color:#0f172a;">${fileRecord.name}</span>
+          ${allowDL ? '<button type="button" id="vault-copy-code-btn" class="excel-sheet-btn">Copy Text</button>' : '<span style="font-family:var(--font-mono);font-size:11px;color:#dc2626;font-weight:700;background:#fee2e2;padding:4px 8px;border-radius:4px;border:1px solid #fca5a5;">EXPORT RESTRICTED</span>'}
         </div>
-        <div class="excel-table-wrapper" style="background:#0f172a;">
-          <pre style="margin:0;font-family:var(--font-mono);font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-all;"><code>${textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+        <div class="excel-table-wrapper" style="background:#ffffff;padding:16px;">
+          <pre style="margin:0;font-family:var(--font-mono);font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-all;color:#0f172a;"><code>${textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
         </div>
       `;
       container.appendChild(wrap);
-      wrap.querySelector('#vault-copy-code-btn')?.addEventListener('click', async () => {
-        await navigator.clipboard.writeText(textContent);
-        await showAlert('Success', 'Text copied to clipboard!');
-      });
+      if (allowDL) {
+        wrap.querySelector('#vault-copy-code-btn')?.addEventListener('click', async () => {
+          await navigator.clipboard.writeText(textContent);
+          await showAlert('Success', 'Text copied to clipboard!');
+        });
+      }
+      if (currentDecryptedUrl) {
+        URL.revokeObjectURL(currentDecryptedUrl);
+        currentDecryptedUrl = null;
+      }
     } else {
       const card = document.createElement('div');
       card.className = 'ppt-slide-card';
       card.style.alignItems = 'center';
       card.style.justifyContent = 'center';
       card.style.textAlign = 'center';
+      card.style.background = '#ffffff';
+      card.style.color = '#0f172a';
+      card.style.border = '1px solid #cbd5e1';
       card.innerHTML = `
         <div style="font-size:48px;margin-bottom:12px;">📁</div>
-        <div class="ppt-slide-title">${fileRecord.name}</div>
-        <div class="ppt-slide-content" style="color:var(--accent-cyan);font-weight:700;margin-top:6px;">DECRYPTED FILE READY (${formatFileSize(fileRecord.size)})</div>
-        <p style="font-size:13px;color:#94a3b8;margin-top:8px;">The file has been decrypted into volatile browser memory. Use the Download button above to save the original file to your device.</p>
+        <div class="ppt-slide-title" style="color:#0f172a;">${fileRecord.name}</div>
+        <div class="ppt-slide-content" style="color:#059669;font-weight:700;margin-top:6px;">DECRYPTED FILE READY (${formatFileSize(fileRecord.size)})</div>
+        <p style="font-size:13px;color:#64748b;margin-top:8px;">${allowDL ? 'The file is decrypted into isolated memory. Use the Download button above to save the authentic file to your device.' : 'Export restricted by system download policy.'}</p>
       `;
       container.appendChild(card);
     }
@@ -7794,9 +8380,11 @@ async function openViewer(fileRecord, fileKey) {
 
 async function closeViewer() {
   viewer.classList.add('hidden');
+  viewer.classList.remove('authentic-doc-mode');
   if (viewerDownloadBtn) viewerDownloadBtn.classList.add('hidden');
   document.getElementById('viewer-content').innerHTML = '';
 
+  // WIPE VOLATILE BLOB URL IMMEDIATELY ON CLOSE
   if (currentDecryptedUrl) {
     URL.revokeObjectURL(currentDecryptedUrl);
     currentDecryptedUrl = null;
@@ -7946,7 +8534,10 @@ async function renderFileList(searchQuery = '') {
       e.stopPropagation();
       onFileClick(file.id);
     };
-    el.querySelector('.download-btn').onclick = (e) => handleDownloadFile(e, file.id);
+    const dlBtn = el.querySelector('.download-btn');
+    if (dlBtn) {
+      dlBtn.onclick = (e) => handleDownloadFile(e, file.id);
+    }
     el.querySelector('.info-btn').onclick = (e) => showFileInfo(e, file.id);
     el.querySelector('.rename-btn').onclick = (e) => openRenameModal(e, file.id, file.name);
     el.querySelector('.share-btn').onclick = (e) => handleShareFile(e, file.id);

@@ -18,6 +18,7 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
   <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
 
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -259,6 +260,27 @@
           <div class="hero-terminal-stream">
             <span class="term-prompt">&gt;</span>
             <span class="term-status-text" id="hero-term-status">INITIALIZING SECURE ENVIRONMENT... CRYPTOGRAPHIC ENGINE: READY [AES-GCM-256] • FILE PROCESSOR: READY • PROTECTION LAYER: ACTIVE</span>
+          </div>
+
+          <!-- Quick Actions: Open .secure Container & PWA Auto-Open Setup -->
+          <div class="vault-quick-actions" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:14px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <input type="file" id="open-container-input" class="file-input-hidden" accept=".secure,.secure.html,.html" />
+              <button type="button" id="open-secure-file-btn" class="cyber-btn cyber-btn-secondary" style="padding:7px 14px; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <span>OPEN / UNLOCK .SECURE FILE</span>
+              </button>
+              <button type="button" id="os-file-assoc-btn" class="cyber-btn cyber-btn-ghost" style="padding:7px 12px; font-size:12px; display:inline-flex; align-items:center; gap:6px;" title="Instructions to configure double-click opening on macOS and Windows">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <span>AUTO-OPEN SETUP GUIDE</span>
+              </button>
+            </div>
+            <div>
+              <button type="button" id="install-pwa-btn" class="cyber-btn cyber-btn-ghost hidden" style="padding:7px 14px; font-size:12px; border-color:var(--accent-cyan); color:var(--accent-cyan); display:inline-flex; align-items:center; gap:6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>INSTALL VAULT (AUTO-OPEN .SECURE)</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -533,7 +555,7 @@
               <div class="completion-header-text">
                 <div class="cyber-kicker kicker-green">● PROTECTION PROTOCOL COMPLETE</div>
                 <h2 class="completion-title">FILE SUCCESSFULLY PROTECTED</h2>
-                <p class="completion-desc">Your protected file has been packaged into a standalone protected HTML file with embedded AES-256-GCM decryption engine.</p>
+                <p class="completion-desc">Your protected file has been packaged into a standardized .secure cryptographic container with an embedded cross-platform browser execution runtime.</p>
               </div>
 
               <!-- Protected Output Security Card -->
@@ -547,7 +569,7 @@
                   <div class="card-row"><span class="card-key">PROTECTION:</span> <strong class="card-val cyber-cyan">AES-256-GCM</strong></div>
                   <div class="card-row"><span class="card-key">STATUS:</span> <strong class="card-val cyber-green">SECURED</strong></div>
                   <div class="card-row"><span class="card-key">INTEGRITY:</span> <strong class="card-val cyber-green">VERIFIED</strong></div>
-                  <div class="card-row"><span class="card-key">FORMAT:</span> <strong class="card-val">Protected HTML (.secure.html)</strong></div>
+                  <div class="card-row"><span class="card-key">FORMAT:</span> <strong class="card-val">Universal .secure Container (.secure.html)</strong></div>
                 </div>
               </div>
 
@@ -555,12 +577,16 @@
               <div class="completion-actions-area">
                 <button type="button" id="download-protected-html-btn" class="cyber-btn cyber-btn-primary cyber-btn-download-lg">
                   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  <span>DOWNLOAD PROTECTED HTML</span>
+                  <span>DOWNLOAD UNIVERSAL SECURE FILE (.secure.html)</span>
                 </button>
-                <p class="download-caption">Self-contained encrypted package. Recipient only requires any standard web browser and the authorization password.</p>
+                <p class="download-caption">Universal Double-Click Runner: Opens automatically in any web browser (Chrome, Safari, Edge, Firefox) on Mac, Windows, iOS &amp; Android with zero setup.</p>
               </div>
 
               <div class="completion-secondary-actions">
+                <button type="button" id="download-pure-secure-btn" class="cyber-btn cyber-btn-ghost" title="Download pure .secure container without .html extension">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span>DOWNLOAD AS .SECURE</span>
+                </button>
                 <button type="button" id="view-in-vault-btn" class="cyber-btn cyber-btn-secondary">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                   <span>VIEW IN VAULT</span>
@@ -713,6 +739,101 @@
       <div id="viewer-content" class="viewer-content cyber-viewer-body"></div>
     </div>
 
+    <!-- Dedicated In-Vault .secure Container Unlock Modal -->
+    <dialog id="unlock-container-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content" style="max-width:520px;">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">AUTHENTIC .SECURE CONTAINER DETECTED</div>
+          <h2 class="cyber-modal-title">UNLOCK SECURE CONTAINER</h2>
+        </div>
+        <div class="container-info-card" style="background: rgba(15,23,42,0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; margin: 12px 0 16px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="font-size:28px;">🔐</div>
+            <div style="flex:1; min-width:0;">
+              <div id="unlock-container-filename" style="font-weight:700; color:var(--text-main); font-size:14px; word-break:break-all;">filename.secure</div>
+              <div id="unlock-container-meta" style="font-size:12px; color:var(--accent-cyan); font-family:var(--font-mono); margin-top:2px;">RFC-2026-SECURE • AES-256-GCM</div>
+            </div>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="unlock-container-password" class="cyber-input-label">AUTHORIZATION PASSWORD</label>
+          <div class="cyber-input-wrap">
+            <input type="password" id="unlock-container-password" placeholder="Enter authorization password..." class="cyber-input cyber-password-input" autofocus />
+            <button type="button" id="toggle-container-password" class="cyber-input-addon-btn" title="Toggle Password Visibility">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <details class="advanced-pepper-accordion" style="margin-top:10px; margin-bottom:14px;">
+          <summary class="pepper-accordion-toggle" style="cursor:pointer; font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:6px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>2FA / Hardware Secret Pepper (Optional)</span>
+          </summary>
+          <div style="margin-top:8px;">
+            <input type="password" id="unlock-container-pepper" class="cyber-input" placeholder="Enter secret pepper (if configured)" autocomplete="off" style="font-size:13px;">
+          </div>
+        </details>
+
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+          <input type="checkbox" id="save-container-to-vault-check" checked style="accent-color:var(--accent-cyan); width:16px; height:16px; cursor:pointer;">
+          <label for="save-container-to-vault-check" style="font-size:12px; color:#94a3b8; cursor:pointer;">Import this container to local Vault storage after unlocking</label>
+        </div>
+
+        <div class="modal-actions cyber-modal-actions">
+          <button id="cancel-unlock-container" class="cyber-btn cyber-btn-ghost">CANCEL</button>
+          <button id="confirm-unlock-container" class="cyber-btn cyber-btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>UNLOCK IN VAULT</span>
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- OS Double-Click File Association Guide Modal -->
+    <dialog id="os-file-assoc-modal" class="modal cyber-modal">
+      <div class="modal-content cyber-modal-content" style="max-width:560px;">
+        <div class="cyber-modal-header">
+          <div class="cyber-modal-tag">OPERATING SYSTEM INTEGRATION</div>
+          <h2 class="cyber-modal-title">AUTO-OPEN .SECURE FILES ON DOUBLE-CLICK</h2>
+        </div>
+        <p style="color:#94a3b8; font-size:13px; margin: 8px 0 16px; line-height: 1.5;">
+          Configure your computer so that double-clicking any <code>.secure</code> file automatically opens it inside Coralgenz Vault.
+        </p>
+
+        <div class="guide-step-card" style="margin-bottom:12px; padding:14px; background: rgba(15,23,42,0.6); border:1px solid var(--border-color); border-radius:8px;">
+          <div style="font-weight:700; color:var(--accent-cyan); font-size:13px; margin-bottom:6px;">OPTION 1: PWA Web App Installation (Fastest)</div>
+          <p style="font-size:13px; color:#cbd5e1; line-height:1.4;">
+            Click <strong>"INSTALL VAULT"</strong> above (or in your browser address bar). The W3C File Handling API automatically registers <code>.secure</code> file association on macOS and Windows!
+          </p>
+        </div>
+
+        <div class="guide-step-card" style="margin-bottom:12px; padding:14px; background: rgba(15,23,42,0.6); border:1px solid var(--border-color); border-radius:8px;">
+          <div style="font-weight:700; color:var(--accent-green); font-size:13px; margin-bottom:6px;">OPTION 2: macOS Finder Association (10 Seconds)</div>
+          <ol style="font-size:12px; color:#cbd5e1; padding-left:18px; line-height:1.6;">
+            <li>Right-click any <code>.secure</code> file in Finder.</li>
+            <li>Select <strong>Get Info</strong> (or press <kbd>Cmd</kbd> + <kbd>I</kbd>).</li>
+            <li>Under <strong>"Open with:"</strong>, select <strong>Google Chrome</strong> (or <strong>Safari</strong>).</li>
+            <li>Click <strong>"Change All..."</strong> to make all <code>.secure</code> files open automatically!</li>
+          </ol>
+        </div>
+
+        <div class="guide-step-card" style="padding:14px; background: rgba(15,23,42,0.6); border:1px solid var(--border-color); border-radius:8px;">
+          <div style="font-weight:700; color:var(--accent-blue); font-size:13px; margin-bottom:6px;">OPTION 3: Universal Double-Click Runner (.secure.html)</div>
+          <p style="font-size:13px; color:#cbd5e1; line-height:1.4;">
+            Files downloaded with the <code>.secure.html</code> runner open instantly on double-click on any device without changing any settings.
+          </p>
+        </div>
+
+        <div class="modal-actions cyber-modal-actions" style="margin-top:20px;">
+          <button id="close-os-assoc-modal" class="cyber-btn cyber-btn-primary" style="width:100%;">GOT IT</button>
+        </div>
+      </div>
+    </dialog>
+
     <!-- File Info Modal -->
     <dialog id="info-modal" class="modal cyber-modal">
       <div class="modal-content cyber-modal-content">
@@ -783,14 +904,46 @@
       </div>
     </dialog>
 
-    <!-- Share Modal -->
+    <!-- Export Protected Container Modal -->
     <dialog id="share-modal" class="modal cyber-modal">
-      <div class="modal-content cyber-modal-content">
+      <div class="modal-content cyber-modal-content" style="max-width: 520px;">
         <div class="cyber-modal-header">
-          <div class="cyber-modal-tag">EXPORT PROTOCOL</div>
-          <h2 class="cyber-modal-title">EXPORT STANDALONE SECURE HTML</h2>
+          <div class="cyber-modal-tag">EXPORT PROTOCOL // RFC-2026-SECURE</div>
+          <h2 class="cyber-modal-title">EXPORT PROTECTED FILE</h2>
         </div>
+
+        <div class="export-target-info" id="share-file-info-box" style="margin-bottom: 16px; padding: 12px 14px; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 8px;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--cyber-cyan); word-break: break-all;" id="share-file-name">Document</div>
+          <div style="font-size: 11px; color: var(--cyber-muted); font-family: var(--font-mono); margin-top: 3px;" id="share-file-meta">16-Layer Quantum-Hardened Defense</div>
+        </div>
+
+        <!-- Format Selector Cards -->
         <div class="input-group">
+          <label class="cyber-input-label">CHOOSE EXPORT FORMAT</label>
+          <div class="export-format-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px;">
+            <label class="export-format-card active" id="format-card-secure-html" style="cursor: pointer; padding: 14px 12px; border-radius: 10px; border: 2px solid var(--cyber-cyan); background: rgba(0, 240, 255, 0.08); transition: all 0.2s ease; display: flex; flex-direction: column; gap: 4px;">
+              <input type="radio" name="export-format" value="html" checked style="display: none;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 16px;">🌐</span>
+                <span class="cyber-card-pill pill-cipher" style="font-size: 9px; padding: 2px 5px;">UNIVERSAL</span>
+              </div>
+              <div style="font-weight: 700; font-size: 13px; color: #ffffff; margin-top: 2px;">.secure.html</div>
+              <div style="font-size: 11px; color: var(--cyber-muted); line-height: 1.35;">Universal access — double-click to open in any web browser.</div>
+            </label>
+
+            <label class="export-format-card" id="format-card-pure-secure" style="cursor: pointer; padding: 14px 12px; border-radius: 10px; border: 1px solid var(--cyber-border); background: rgba(255, 255, 255, 0.02); transition: all 0.2s ease; display: flex; flex-direction: column; gap: 4px;">
+              <input type="radio" name="export-format" value="secure" style="display: none;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 16px;">🛡️</span>
+                <span class="cyber-card-pill pill-policy" style="font-size: 9px; padding: 2px 5px;">VAULT SECURE</span>
+              </div>
+              <div style="font-weight: 700; font-size: 13px; color: #ffffff; margin-top: 2px;">.secure</div>
+              <div style="font-size: 11px; color: var(--cyber-muted); line-height: 1.35;">Pure container — you can open in Coralgenz Vault securely.</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="input-group" style="margin-top: 14px;">
           <label class="cyber-input-label">FILE AUTHORIZATION PASSWORD</label>
           <div class="cyber-input-wrap">
             <input type="password" id="share-password" placeholder="Enter original file password" class="cyber-input cyber-password-input">
@@ -803,32 +956,37 @@
               </svg>
             </button>
           </div>
+          <p class="hint cyber-hint">Password is required to verify ownership and re-encrypt the export container.</p>
         </div>
-        <div class="input-group">
-          <label class="cyber-input-label">BRAND / SYSTEM TITLE (OPTIONAL)</label>
-          <input type="text" id="share-title" placeholder="Coralgenz Vault" class="cyber-input">
-        </div>
-        <div class="input-group">
-          <label class="cyber-input-label">CUSTOM EMBEDDED LOGO (OPTIONAL)</label>
-          <div class="logo-upload-zone cyber-logo-drop" id="share-logo-zone">
-            <input type="file" id="share-logo" accept="image/*" class="file-input-hidden">
-            <div class="upload-icon-small">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
-            </div>
-            <span id="share-logo-text" class="logo-drop-text">Choose Logo File</span>
+
+        <div id="html-customization-options">
+          <div class="input-group">
+            <label class="cyber-input-label">BRAND / SYSTEM TITLE (OPTIONAL)</label>
+            <input type="text" id="share-title" placeholder="Coralgenz Vault" class="cyber-input">
           </div>
-          <p class="hint cyber-hint">Brand logo rendered inside standalone exported HTML login terminal.</p>
+          <div class="input-group">
+            <label class="cyber-input-label">CUSTOM EMBEDDED LOGO (OPTIONAL)</label>
+            <div class="logo-upload-zone cyber-logo-drop" id="share-logo-zone">
+              <input type="file" id="share-logo" accept="image/*" class="file-input-hidden">
+              <div class="upload-icon-small">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <span id="share-logo-text" class="logo-drop-text">Choose Logo File</span>
+            </div>
+            <p class="hint cyber-hint">Brand logo rendered inside standalone exported HTML login terminal.</p>
+          </div>
         </div>
-        <div class="modal-actions cyber-modal-actions">
+
+        <div class="modal-actions cyber-modal-actions" style="margin-top: 16px;">
           <button id="cancel-share" class="cyber-btn cyber-btn-ghost">CANCEL</button>
           <button id="confirm-share" class="cyber-btn cyber-btn-primary">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>EXPORT SECURE FILE</span>
+            <span id="confirm-share-btn-text">EXPORT AS .SECURE.HTML</span>
           </button>
         </div>
       </div>
@@ -868,7 +1026,7 @@
             <div class="settings-card-header-row">
               <h4 class="settings-card-title"><span class="card-title-icon">📥</span> DOWNLOAD POLICIES</h4>
             </div>
-            <p class="hint cyber-hint">Enforces whether decrypted files can be extracted locally or viewed strictly within the browser sandbox.</p>
+            <p class="hint cyber-hint">Controls download permissions embedded into exported .secure &amp; .secure.html files. Does not restrict actions within your local Protected Vault Archive.</p>
             
             <div class="settings-items-list">
               <div class="setting-item">
@@ -876,8 +1034,8 @@
                   <div class="switch-label-col">
                     <span class="switch-item-icon">🖼️</span>
                     <div class="switch-item-info">
-                      <span class="switch-label-text">Media Export</span>
-                      <span class="switch-subtext">Images, Audio &amp; Video files</span>
+                      <span class="switch-label-text">Media Downloads in Exported Files</span>
+                      <span class="switch-subtext">Allow recipients of exported containers to download Images, Audio &amp; Video</span>
                     </div>
                   </div>
                   <div class="switch-right-side">
@@ -895,8 +1053,8 @@
                   <div class="switch-label-col">
                     <span class="switch-item-icon">📑</span>
                     <div class="switch-item-info">
-                      <span class="switch-label-text">Document Export</span>
-                      <span class="switch-subtext">PDF, DOCX, XLSX &amp; CSV files</span>
+                      <span class="switch-label-text">Document Downloads in Exported Files</span>
+                      <span class="switch-subtext">Allow recipients of exported containers to download PDF, DOCX, XLSX &amp; CSV</span>
                     </div>
                   </div>
                   <div class="switch-right-side">
@@ -1080,16 +1238,16 @@
                 <div class="step-num-pill">04</div>
                 <div class="step-icon-wrap">📥</div>
                 <div class="step-title-group">
-                  <h3 class="step-title">Download Your .secure.html File</h3>
+                  <h3 class="step-title">Download Your Universal .secure File</h3>
                   <span class="step-badge">SELF-CONTAINED FORTRESS</span>
                 </div>
               </div>
               <p class="step-desc">
-                Tap <strong>"DOWNLOAD SECURED FILE"</strong> to save your file as <code>.secure.html</code>. It contains both your encrypted data and its own offline decryptor!
+                Tap <strong>"DOWNLOAD UNIVERSAL SECURE FILE (.secure.html)"</strong>. The <code>.secure</code> extension defines the multi-cipher container standard, while the <code>.html</code> runner allows operating systems (Mac, Windows, iOS, Android) to launch the zero-knowledge decryptor automatically on double-click!
               </p>
               <div class="step-tip-callout tip-purple">
                 <span class="tip-icon">✨</span>
-                <span class="tip-text"><strong>Self-Contained:</strong> You can send this file anywhere (Email, WhatsApp, USB) and open it on any device without installing any software.</span>
+                <span class="tip-text"><strong>Universal Compatibility:</strong> Recipients do not need to install any special software. Double-clicking the file opens it instantly in any web browser.</span>
               </div>
             </div>
 
@@ -1110,12 +1268,12 @@
                 <div class="step-num-pill">A</div>
                 <div class="step-icon-wrap">🌐</div>
                 <div class="step-title-group">
-                  <h3 class="step-title">Open in Any Browser</h3>
+                  <h3 class="step-title">Double-Click to Open</h3>
                   <span class="step-badge">PHONE, TABLET OR LAPTOP</span>
                 </div>
               </div>
               <p class="step-desc">
-                Double-click or tap the <code>.secure.html</code> file. It opens instantly in Safari, Chrome, Edge, Firefox, or Samsung Internet. No app installation is required!
+                Double-click the <code>.secure.html</code> file. It opens instantly in Safari, Chrome, Edge, Firefox, or Samsung Internet. (If you have a pure <code>.secure</code> file, drag and drop it into any browser or Coralgenz Vault!)
               </p>
             </div>
 
@@ -1263,7 +1421,7 @@
                 <h4>Can I send a protected file over WhatsApp, Email, or Google Drive?</h4>
               </div>
               <div class="faq-answer">
-                <p><strong>Yes, absolutely!</strong> The downloaded <code>.secure.html</code> file is a standard file. You can attach it to emails, share it via WhatsApp, Telegram, USB drives, or Cloud storage. The recipient only needs any modern browser and your password.</p>
+                <p><strong>Yes, absolutely!</strong> The downloaded <code>.secure</code> file is a standard cryptographic container. You can attach it to emails, share it via WhatsApp, Telegram, USB drives, or Cloud storage. The recipient only needs any modern browser and your password.</p>
               </div>
             </div>
 
@@ -1300,7 +1458,7 @@
             <div class="faq-card">
               <div class="faq-question">
                 <span class="faq-q-badge">Q</span>
-                <h4>What if I accidentally drop a .secure.html file back into this app?</h4>
+                <h4>What if I accidentally drop a .secure file back into this app?</h4>
               </div>
               <div class="faq-answer">
                 <p>Coralgenz Vault automatically detects files that are already secured. Instead of re-encrypting it, it prevents duplicate locking and advises you to open and unlock it.</p>

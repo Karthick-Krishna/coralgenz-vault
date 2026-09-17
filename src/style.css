@@ -117,21 +117,9 @@ body {
   line-height: 1.5;
 }
 
-/* Fine cybersecurity scanlines */
+/* Crisp display rendering (scanlines removed for original 100% quality) */
 body::before {
-  content: '';
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0.06) 0px,
-    rgba(0, 0, 0, 0.06) 1px,
-    transparent 1px,
-    transparent 2px
-  );
-  pointer-events: none;
-  z-index: 999;
-  opacity: 0.6;
+  display: none;
 }
 
 /* Ambient Matrix / Cyber Background Canvas */
@@ -3175,11 +3163,15 @@ body::before {
 
 .cyber-viewer-body img,
 .cyber-viewer-body video {
-  max-width: 90vw;
-  max-height: 80vh;
+  max-width: 95vw;
+  max-height: 88vh;
   border-radius: var(--radius-md);
-  border: 1px solid var(--cyber-border);
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  object-fit: contain;
 }
 
 .excel-viewer, .word-viewer, .ppt-viewer {
@@ -5376,4 +5368,84 @@ body::before {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Authentic Document View Mode (Clean Light Mode Presentation) */
+.viewer-overlay.authentic-doc-mode {
+  background: #f1f5f9 !important;
+  backdrop-filter: none !important;
+  color: #0f172a !important;
+}
+
+.viewer-overlay.authentic-doc-mode .cyber-viewer-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+.viewer-overlay.authentic-doc-mode .viewer-title {
+  color: #0f172a !important;
+  font-family: var(--font-ui) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+}
+
+.viewer-overlay.authentic-doc-mode .viewer-shield-badge {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.viewer-overlay.authentic-doc-mode .cyber-btn-icon {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.viewer-overlay.authentic-doc-mode .cyber-btn-icon:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+  transform: translateY(-1px);
+}
+
+.viewer-overlay.authentic-doc-mode .cyber-viewer-body {
+  background: #f1f5f9 !important;
+}
+
+.viewer-overlay.authentic-doc-mode .excel-viewer,
+.viewer-overlay.authentic-doc-mode .word-viewer,
+.viewer-overlay.authentic-doc-mode .ppt-viewer {
+  background: #ffffff !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.viewer-overlay.authentic-doc-mode .excel-toolbar {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.viewer-overlay.authentic-doc-mode .excel-format-pill {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.viewer-overlay.authentic-doc-mode .excel-stats-pill {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+}
+
+.viewer-overlay.authentic-doc-mode .excel-table th {
+  background: #f8fafc !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.viewer-overlay.authentic-doc-mode .excel-table td {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
 }

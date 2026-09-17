@@ -1772,7 +1772,7 @@ export class SecureCrypto {
         return { iv, ciphertext: encrypted };
     }
 
-    // Decrypt data -> ArrayBuffer with optional AEAD header authentication
+    // Decrypt data -> ArrayBuffer with mandatory AEAD header authentication when provided
     static async decryptData(key, iv, ciphertext, additionalData = null) {
         const cryptoObj = getCrypto();
         const cleanIv = (iv instanceof Uint8Array) ? iv : new Uint8Array(iv);
@@ -1780,22 +1780,11 @@ export class SecureCrypto {
         if (additionalData) {
             algorithm.additionalData = (additionalData instanceof Uint8Array) ? additionalData : new Uint8Array(additionalData);
         }
-        try {
-            return await cryptoObj.subtle.decrypt(
-                algorithm,
-                key,
-                ciphertext
-            );
-        } catch (err) {
-            if (additionalData) {
-                return await cryptoObj.subtle.decrypt(
-                    { name: 'AES-GCM', iv: cleanIv },
-                    key,
-                    ciphertext
-                );
-            }
-            throw err;
-        }
+        return await cryptoObj.subtle.decrypt(
+            algorithm,
+            key,
+            ciphertext
+        );
     }
 
     // Export key to raw format
