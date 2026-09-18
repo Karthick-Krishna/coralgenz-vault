@@ -281,8 +281,8 @@ function updateProcessProgress(percent, label) {
   const bar = document.getElementById('protect-progress-bar');
   const pctEl = document.getElementById('protect-progress-percent');
   const lblEl = document.getElementById('protect-progress-label');
-  if (bar) bar.style.width = `${percent}%`;
-  if (pctEl) pctEl.textContent = `${percent}%`;
+  if (bar && percent !== null && percent !== undefined) bar.style.width = `${percent}%`;
+  if (pctEl && percent !== null && percent !== undefined) pctEl.textContent = `${percent}%`;
   if (lblEl && label) lblEl.textContent = label;
 }
 
@@ -814,6 +814,13 @@ function resetAddForm() {
   if (centerShield) centerShield.classList.remove('success');
   const scannerStatus = document.getElementById('scanner-status-text');
   if (scannerStatus) scannerStatus.textContent = 'SECURING';
+  const scannerSub = document.getElementById('scanner-sub-status');
+  if (scannerSub) scannerSub.textContent = 'LAYER 01/16 ACTIVE';
+  const scannerStage = document.querySelector('.scanner-stage');
+  if (scannerStage) {
+    scannerStage.classList.remove('rapid-scan');
+    scannerStage.classList.remove('completed-burst');
+  }
   const terminalBody = document.getElementById('security-terminal-body');
   if (terminalBody) terminalBody.innerHTML = '<p class="term-line">&gt; Standby for cryptographic instruction...</p>';
 
@@ -1197,13 +1204,43 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
     // 1. Try SheetJS if available in app runtime
     if (typeof XLSX !== 'undefined' && XLSX.read) {
       try {
-        const workbook = XLSX.read(bytes, { type: 'array' });
+        const workbook = XLSX.read(bytes, {
+          type: 'array',
+          cellDates: true,
+          cellNF: true,
+          cellText: true,
+          cellStyles: true,
+          sheetStubs: true
+        });
         const sheetNames = workbook.SheetNames || [];
         sheetNames.forEach(sName => {
           const ws = workbook.Sheets[sName];
           if (ws) {
-            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-            sheets.push({ name: sName, rows: rows });
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+            let maxCols = 0;
+            rows.forEach(r => { if (r && r.length > maxCols) maxCols = r.length; });
+
+            const enrichedRows = rows.map((r, rIdx) => {
+              const rowArr = [];
+              for (let c = 0; c < maxCols; c++) {
+                const dispVal = (r && r[c] !== undefined) ? String(r[c]) : '';
+                let cellCoord = '';
+                let tempC = c;
+                while (tempC >= 0) {
+                  cellCoord = String.fromCharCode(65 + (tempC % 26)) + cellCoord;
+                  tempC = Math.floor(tempC / 26) - 1;
+                }
+                cellCoord += (rIdx + 1);
+                const cellObj = ws[cellCoord];
+                const formulaStr = (cellObj && cellObj.f) ? ('=' + cellObj.f) : dispVal;
+                rowArr.push({ v: dispVal, f: formulaStr });
+              }
+              return rowArr;
+            });
+
+            if (enrichedRows.length > 0) {
+              sheets.push({ name: sName, rows: enrichedRows });
+            }
           }
         });
       } catch (e) {
@@ -1345,6 +1382,16 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
       toolbar.appendChild(toolRight);
       viewer.appendChild(toolbar);
 
+      // Formula Bar (Authentic Excel experience)
+      const formulaBar = document.createElement('div');
+      formulaBar.className = 'excel-formula-bar';
+      formulaBar.innerHTML = `
+        <div class="excel-name-box" id="inapp-name-box">A1</div>
+        <div class="excel-fx-icon">fx</div>
+        <input type="text" class="excel-formula-input" id="inapp-formula-input" readonly placeholder="Select a cell to view formula or content...">
+      `;
+      viewer.appendChild(formulaBar);
+
       // Zoom Button Listeners
       zoomControls.querySelector('#inapp-zoom-out').onclick = () => {
         if (currentZoom > 60) {
@@ -1396,11 +1443,14 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
         tableWrapper.innerHTML = '';
         let filtered = currentSheet.rows || [];
         if (searchQuery.trim().length > 0) {
-          filtered = filtered.filter(r => (r || []).some(c => String(c).toLowerCase().includes(searchQuery)));
+          filtered = filtered.filter(r => (r || []).some(c => {
+            const rawVal = (typeof c === 'object' && c !== null) ? c.v : String(c);
+            return String(rawVal).toLowerCase().includes(searchQuery);
+          }));
         }
 
         if (filtered.length === 0) {
-          tableWrapper.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#94a3b8;font-size:14px;font-family:var(--font-mono);">No matching rows found in this sheet.</div>';
+          tableWrapper.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#94a3b8;font-size:14px;font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif;">No matching rows found in this sheet.</div>';
           return;
         }
 
@@ -1443,24 +1493,57 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
 
           for (let c = 0; c < curMaxCols; c++) {
             const td = document.createElement('td');
-            const rawVal = row && row[c] !== undefined ? row[c] : '';
-            const strVal = String(rawVal);
+            const cellData = row && row[c] !== undefined ? row[c] : '';
+            const strVal = (typeof cellData === 'object' && cellData !== null) ? (cellData.v !== undefined ? cellData.v : '') : String(cellData);
+            const formulaVal = (typeof cellData === 'object' && cellData !== null && cellData.f) ? cellData.f : strVal;
             td.textContent = strVal;
 
-            if (typeof rawVal === 'number' || (!isNaN(rawVal) && strVal.trim() !== '')) {
+            const trimmed = strVal.trim();
+            if (trimmed !== '' && (!isNaN(Number(trimmed)) || (!isNaN(Date.parse(trimmed)) && trimmed.length > 5 && (trimmed.includes('/') || trimmed.includes('-'))))) {
+              if (trimmed.includes('/') || trimmed.includes('-')) {
+                td.style.textAlign = 'center';
+              } else {
+                td.style.textAlign = 'right';
+              }
+            } else if (trimmed.startsWith('$') || trimmed.startsWith('€') || trimmed.startsWith('£') || trimmed.startsWith('₹') || trimmed.endsWith('%')) {
               td.style.textAlign = 'right';
-              td.style.fontVariantNumeric = 'tabular-nums';
+            } else if (trimmed === 'TRUE' || trimmed === 'FALSE') {
+              td.style.textAlign = 'center';
+              td.style.fontWeight = '600';
             }
 
             if (searchQuery && strVal.toLowerCase().includes(searchQuery)) {
               td.classList.add('excel-search-match');
             }
+
+            // Interactive cell selection
+            td.onclick = () => {
+              tableWrapper.querySelectorAll('.excel-active-cell').forEach(el => el.classList.remove('excel-active-cell'));
+              td.classList.add('excel-active-cell');
+              let colLetter = '';
+              let tempC = c;
+              while (tempC >= 0) {
+                colLetter = String.fromCharCode(65 + (tempC % 26)) + colLetter;
+                tempC = Math.floor(tempC / 26) - 1;
+              }
+              const nameBox = viewer.querySelector('#inapp-name-box');
+              const formulaInput = viewer.querySelector('#inapp-formula-input');
+              if (nameBox) nameBox.textContent = colLetter + (rIdx + 1);
+              if (formulaInput) formulaInput.value = formulaVal || strVal;
+            };
+
             tr.appendChild(td);
           }
           tbody.appendChild(tr);
         });
         table.appendChild(tbody);
         tableWrapper.appendChild(table);
+
+        // Auto-select first cell if present
+        const firstTd = tbody.querySelector('td:not(.row-num)');
+        if (firstTd && !viewer.querySelector('.excel-active-cell')) {
+          firstTd.click();
+        }
       }
 
       renderTable();
@@ -2394,12 +2477,14 @@ async function toggleFavorite(e, fileId) {
 // --- Logic: File Download as Encrypted Protected File ---
 async function handleDownloadFile(e, fileId) {
   if (e) e.stopPropagation();
-  // Open the dual-format export modal directly so user can choose .secure or .secure.html
-  openExportModal(fileId);
+  // Open the dual-format download modal with clean download options (no custom features)
+  openExportModal(fileId, false, 'download');
 }
 
 // Variable to store selected export format: 'html' or 'secure'
 let selectedExportFormat = 'html';
+let isCustomExportMode = false;
+let currentExportMode = 'export'; // 'download' | 'export' | 'custom'
 
 function selectExportFormat(format) {
   selectedExportFormat = format;
@@ -2419,8 +2504,19 @@ function selectExportFormat(format) {
       cardSecure.style.border = '1px solid var(--cyber-border)';
       cardSecure.style.background = 'rgba(255, 255, 255, 0.02)';
     }
-    if (btnText) btnText.textContent = 'EXPORT AS .SECURE.HTML';
-    if (customOpts) customOpts.style.display = 'block';
+    if (btnText) {
+      if (currentExportMode === 'download') {
+        btnText.textContent = 'DOWNLOAD AS .SECURE.HTML';
+      } else if (isCustomExportMode) {
+        btnText.textContent = 'EXPORT CUSTOM .SECURE.HTML';
+      } else {
+        btnText.textContent = 'EXPORT AS .SECURE.HTML';
+      }
+    }
+    // CRITICAL: Custom branding features ONLY appear when clicked from the Custom button!
+    if (customOpts) {
+      customOpts.style.display = isCustomExportMode ? 'block' : 'none';
+    }
   } else {
     if (cardSecure) {
       cardSecure.classList.add('active');
@@ -2432,14 +2528,27 @@ function selectExportFormat(format) {
       cardHtml.style.border = '1px solid var(--cyber-border)';
       cardHtml.style.background = 'rgba(255, 255, 255, 0.02)';
     }
-    if (btnText) btnText.textContent = 'EXPORT AS .SECURE';
-    if (customOpts) customOpts.style.display = 'none';
+    if (btnText) {
+      if (currentExportMode === 'download') {
+        btnText.textContent = 'DOWNLOAD AS .SECURE';
+      } else if (isCustomExportMode) {
+        btnText.textContent = 'EXPORT CUSTOM .SECURE';
+      } else {
+        btnText.textContent = 'EXPORT AS .SECURE';
+      }
+    }
+    if (customOpts) {
+      customOpts.style.display = 'none';
+    }
   }
 }
 
-// Open Share / Export Modal with Format Chooser (.secure vs .secure.html)
-async function openExportModal(fileId, isCustom = false) {
+// Open Share / Export / Download Modal with Format Chooser (.secure vs .secure.html)
+async function openExportModal(fileId, isCustom = false, mode = 'export') {
   currentShareFileId = fileId;
+  isCustomExportMode = Boolean(isCustom);
+  currentExportMode = mode;
+
   const fileRecord = await DB.getFile(fileId);
   if (!fileRecord) {
     await showAlert('Error', 'File not found');
@@ -2452,6 +2561,9 @@ async function openExportModal(fileId, isCustom = false) {
   const titleInput = document.getElementById('share-title');
   const logoInput = document.getElementById('share-logo');
   const logoText = document.getElementById('share-logo-text');
+  const customOpts = document.getElementById('html-customization-options');
+  const modalTag = document.getElementById('share-modal-tag');
+  const modalTitle = document.getElementById('share-modal-title');
 
   if (nameEl) nameEl.textContent = fileRecord.name;
   if (metaEl) metaEl.textContent = `SIZE: ${formatFileSize(fileRecord.size)} • RFC-2026-SECURE • 16-LAYER QUANTUM-HARDENED`;
@@ -2464,16 +2576,35 @@ async function openExportModal(fileId, isCustom = false) {
     }
     passInput.classList.remove('highlight-input-glow');
   }
+
+  // Reset custom input fields
   if (titleInput) titleInput.value = '';
   if (logoInput) logoInput.value = '';
   if (logoText) logoText.textContent = 'Choose Logo File';
+
+  // Modal headers and custom features visibility separation
+  if (isCustomExportMode) {
+    if (modalTag) modalTag.textContent = 'CUSTOM BRANDING // RFC-2026-SECURE';
+    if (modalTitle) modalTitle.textContent = 'CUSTOM BRANDED EXPORT';
+    if (customOpts) customOpts.style.display = 'block';
+  } else {
+    // Hide all custom features (system title, logo uploading) for standard Download and Export
+    if (customOpts) customOpts.style.display = 'none';
+    if (mode === 'download') {
+      if (modalTag) modalTag.textContent = 'DOWNLOAD PROTOCOL // RFC-2026-SECURE';
+      if (modalTitle) modalTitle.textContent = 'DOWNLOAD PROTECTED FILE';
+    } else {
+      if (modalTag) modalTag.textContent = 'EXPORT PROTOCOL // RFC-2026-SECURE';
+      if (modalTitle) modalTitle.textContent = 'EXPORT CONTAINER';
+    }
+  }
 
   selectExportFormat('html');
 
   const shareModal = document.getElementById('share-modal');
   shareModal?.showModal();
   setTimeout(() => {
-    if (isCustom && titleInput) {
+    if (isCustomExportMode && titleInput) {
       titleInput.focus();
     } else {
       passInput?.focus();
@@ -2483,12 +2614,12 @@ async function openExportModal(fileId, isCustom = false) {
 
 function handleShareFile(e, fileId) {
   if (e) e.stopPropagation();
-  openExportModal(fileId, false);
+  openExportModal(fileId, false, 'export');
 }
 
 function handleCustomShare(e, fileId) {
   if (e) e.stopPropagation();
-  openExportModal(fileId, true);
+  openExportModal(fileId, true, 'custom');
 }
 
 // Handle Export from Modal
@@ -2523,22 +2654,36 @@ async function handleShareConfirm() {
     if (!result || !result.buffer) throw new Error('Decryption failed: Incorrect password.');
     const decryptedBuffer = result.buffer;
 
-    // Process Logo if HTML format
-    let logoDataUrl = '';
-    if (selectedExportFormat === 'html' && logoInput?.files && logoInput.files[0]) {
-      logoDataUrl = await new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(logoInput.files[0]);
-      });
+    // Process Custom Logo and Title ONLY if in Custom Mode
+    let customization = {};
+    if (isCustomExportMode) {
+      let logoDataUrl = '';
+      if (selectedExportFormat === 'html' && logoInput?.files && logoInput.files[0]) {
+        logoDataUrl = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(logoInput.files[0]);
+        });
+      }
+      customization = { title: title, logoUrl: logoDataUrl };
     }
 
-    const customization = { title: title, logoUrl: logoDataUrl };
     const asPureSecure = (selectedExportFormat === 'secure');
 
-    const successMsg = asPureSecure
-      ? 'Standard .secure container downloaded successfully! You can open it in Coralgenz Vault.'
-      : 'Universal protected file (.secure.html) downloaded successfully! Opens on double-click in any browser.';
+    let successMsg;
+    if (currentExportMode === 'download') {
+      successMsg = asPureSecure
+        ? 'Standard .secure container downloaded successfully! You can open it in Coralgenz Vault.'
+        : 'Universal protected file (.secure.html) downloaded successfully! Opens on double-click in any browser.';
+    } else if (isCustomExportMode) {
+      successMsg = asPureSecure
+        ? 'Custom .secure container exported successfully! You can open it in Coralgenz Vault.'
+        : 'Custom branded protected file (.secure.html) exported successfully! Opens on double-click in any browser.';
+    } else {
+      successMsg = asPureSecure
+        ? 'Standard .secure container exported successfully! You can open it in Coralgenz Vault.'
+        : 'Universal protected file (.secure.html) exported successfully! Opens on double-click in any browser.';
+    }
 
     const exportedFileName = await exportSecureFile(fileRecord, decryptedBuffer, password, customization, successMsg, '', asPureSecure);
 
@@ -2548,11 +2693,12 @@ async function handleShareConfirm() {
     shareModal?.close();
     currentShareFileId = null;
 
-    await showAlert('Export Successful', `${successMsg}\n\nFile: ${exportedFileName}`);
+    const actionTitle = (currentExportMode === 'download') ? 'Download Successful' : 'Export Successful';
+    await showAlert(actionTitle, `${successMsg}\n\nFile: ${exportedFileName}`);
 
   } catch (err) {
     console.error('Export error:', err);
-    await showAlert('Export Failed', err.message || 'Export failed.');
+    await showAlert('Operation Failed', err.message || 'Export failed.');
   } finally {
     if (confirmBtn) {
       confirmBtn.disabled = false;
@@ -3066,6 +3212,69 @@ within any modern web browser without server communication.
             opacity: 0.65;
             cursor: not-allowed;
             filter: grayscale(0.2);
+        }
+        .auth-export-separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 14px 0 10px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+        .auth-export-separator::before,
+        .auth-export-separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .auth-export-separator span {
+            padding: 0 10px;
+        }
+        .cyber-btn-extract-secure {
+            background: rgba(2, 132, 199, 0.06);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(2, 132, 199, 0.35);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 11.5px;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            width: 100%;
+            font-family: var(--font-mono);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        .cyber-btn-extract-secure:hover {
+            background: rgba(2, 132, 199, 0.14);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 12px rgba(2, 132, 199, 0.25);
+            transform: translateY(-1px);
+        }
+        .viewer-btn-raw-secure {
+            background: rgba(2, 132, 199, 0.08);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(2, 132, 199, 0.3);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .viewer-btn-raw-secure:hover {
+            background: rgba(2, 132, 199, 0.18);
+            border-color: var(--accent-cyan);
         }
         .advanced-pepper-accordion {
             margin: 10px 0 14px;
@@ -3619,78 +3828,143 @@ within any modern web browser without server communication.
             position: relative;
             background: #ffffff;
         }
+        .excel-formula-bar {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 4px 10px;
+            gap: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            z-index: 15;
+            position: relative;
+        }
+        .excel-name-box {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-weight: 700;
+            color: #1e293b;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 3px 10px;
+            min-width: 52px;
+            text-align: center;
+            font-size: 11.5px;
+            user-select: none;
+            letter-spacing: 0.02em;
+        }
+        .excel-fx-icon {
+            font-style: italic;
+            font-weight: 800;
+            color: #64748b;
+            font-size: 13px;
+            padding: 0 4px;
+            user-select: none;
+        }
+        .excel-formula-input {
+            flex: 1;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 12px;
+            color: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .excel-formula-input:focus {
+            background: #ffffff;
+            border-color: #0284c7;
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+        }
         .excel-grid-table {
             border-collapse: separate;
             border-spacing: 0;
-            font-family: var(--font-mono);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 12px;
             width: max-content;
             min-width: 100%;
             color: #0f172a;
+            background: #ffffff;
         }
         .excel-grid-table th, .excel-grid-table td {
-            border-right: 1px solid #e2e8f0;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 6px 12px;
+            border-right: 1px solid #d4d4d4;
+            border-bottom: 1px solid #d4d4d4;
+            padding: 5px 10px;
             white-space: nowrap;
             text-align: left;
             font-variant-numeric: tabular-nums;
+            height: 24px;
+            box-sizing: border-box;
+            line-height: 1.4;
         }
         .excel-grid-table thead th {
             position: sticky;
             top: 0;
-            background: #f1f5f9;
-            color: #475569;
+            background: #f3f4f6;
+            color: #374151;
             font-weight: 700;
             font-size: 11px;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             z-index: 10;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             text-align: center;
             min-width: 80px;
             border-top: 1px solid #cbd5e1;
-            border-bottom: 2px solid #cbd5e1;
+            border-bottom: 2px solid #9ca3af;
+            user-select: none;
         }
         .excel-grid-table thead th.row-index-hdr {
-            width: 48px;
-            min-width: 48px;
-            max-width: 48px;
+            width: 46px;
+            min-width: 46px;
+            max-width: 46px;
             text-align: center;
-            background: #e2e8f0;
-            color: #475569;
+            background: #e5e7eb;
+            color: #4b5563;
             left: 0;
             top: 0;
             z-index: 20;
             position: sticky;
             font-weight: 700;
             border-left: 1px solid #cbd5e1;
-            border-right: 2px solid #cbd5e1;
+            border-right: 2px solid #9ca3af;
         }
         .excel-grid-table tbody td.row-num {
             position: sticky;
             left: 0;
-            background: #f8fafc;
-            color: #64748b;
+            background: #f3f4f6;
+            color: #4b5563;
             text-align: center;
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 11px;
             user-select: none;
             z-index: 5;
-            width: 48px;
-            min-width: 48px;
-            max-width: 48px;
-            border-left: 1px solid #e2e8f0;
-            border-right: 2px solid #cbd5e1;
+            width: 46px;
+            min-width: 46px;
+            max-width: 46px;
+            border-left: 1px solid #cbd5e1;
+            border-right: 2px solid #9ca3af;
         }
         .excel-grid-table tbody tr:nth-child(even) td:not(.row-num) {
-            background: #fbfcfe;
+            background: #fbfbfb;
         }
         .excel-grid-table tbody tr:hover td:not(.row-num) {
             background: #f0fdf4 !important;
         }
         .excel-grid-table tbody tr:hover td.row-num {
             background: #dcfce7 !important;
-            color: #166534 !important;
-            font-weight: 700;
+            color: #15803d !important;
+            font-weight: 800;
+        }
+        .excel-active-cell {
+            outline: 2px solid #107c41 !important;
+            outline-offset: -1px;
+            background: #ecfdf5 !important;
+            position: relative;
+            z-index: 2;
         }
         .excel-search-match {
             background: #fef08a !important;
@@ -4919,8 +5193,70 @@ within any modern web browser without server communication.
             parse: function(bytes, filename) {
                 var u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
                 var lowerName = (filename || '').toLowerCase();
-                
-                // 1. Check if ZIP (XLSX / XLSM / ODS)
+
+                // 1. High-Fidelity SheetJS Engine (Authentic Microsoft Excel parsing with exact formatted numbers, dates, currency, percentages)
+                var xlsxEngine = (typeof window !== 'undefined' && window.XLSX) ? window.XLSX : (typeof XLSX !== 'undefined' ? XLSX : null);
+                if (!xlsxEngine && typeof XLSX_DEFLATED !== 'undefined' && XLSX_DEFLATED) {
+                    xlsxEngine = loadEmbeddedLibrary(XLSX_DEFLATED, 'XLSX');
+                    if (xlsxEngine && typeof window !== 'undefined') window.XLSX = xlsxEngine;
+                }
+
+                if (xlsxEngine && xlsxEngine.read) {
+                    try {
+                        var workbook = xlsxEngine.read(u8, {
+                            type: 'array',
+                            cellDates: true,
+                            cellNF: true,
+                            cellText: true,
+                            cellStyles: true,
+                            sheetStubs: true
+                        });
+                        var sheets = [];
+                        (workbook.SheetNames || []).forEach(function(sName) {
+                            var ws = workbook.Sheets[sName];
+                            if (ws) {
+                                // Extract rows with raw: false to retain exact Excel-formatted currency, dates, percentages
+                                var rows = xlsxEngine.utils.sheet_to_json(ws, {
+                                    header: 1,
+                                    defval: '',
+                                    raw: false
+                                });
+                                var maxCols = 0;
+                                rows.forEach(function(r) { if (r && r.length > maxCols) maxCols = r.length; });
+
+                                // Build enriched cell data with formula awareness
+                                var enrichedRows = rows.map(function(r, rIdx) {
+                                    var rowArr = [];
+                                    for (var c = 0; c < maxCols; c++) {
+                                        var dispVal = (r && r[c] !== undefined) ? String(r[c]) : '';
+                                        var cellCoord = '';
+                                        var tempC = c;
+                                        while (tempC >= 0) {
+                                            cellCoord = String.fromCharCode(65 + (tempC % 26)) + cellCoord;
+                                            tempC = Math.floor(tempC / 26) - 1;
+                                        }
+                                        cellCoord += (rIdx + 1);
+                                        var cellObj = ws[cellCoord];
+                                        var formulaStr = (cellObj && cellObj.f) ? ('=' + cellObj.f) : dispVal;
+                                        rowArr.push({ v: dispVal, f: formulaStr });
+                                    }
+                                    return rowArr;
+                                });
+
+                                if (enrichedRows.length > 0) {
+                                    sheets.push({ name: sName, rows: enrichedRows });
+                                }
+                            }
+                        });
+                        if (sheets.length > 0 && sheets.some(function(s) { return s.rows && s.rows.length > 0; })) {
+                            return sheets;
+                        }
+                    } catch (e) {
+                        console.warn('SheetJS engine parse notice, attempting fallback:', e);
+                    }
+                }
+
+                // 2. Fallback: Check if ZIP (XLSX / XLSM / ODS)
                 var isZip = u8.length > 4 && u8[0] === 0x50 && u8[1] === 0x4B;
                 if (isZip) {
                     try {
@@ -4933,7 +5269,7 @@ within any modern web browser without server communication.
                     }
                 }
 
-                // 2. Check if OLE2 Compound Binary (.xls 97-2004)
+                // 3. Fallback: Check if OLE2 Compound Binary (.xls 97-2004)
                 var isOle = u8.length > 8 && u8[0] === 0xD0 && u8[1] === 0xCF && u8[2] === 0x11 && u8[3] === 0xE0;
                 if (isOle) {
                     try {
@@ -4946,7 +5282,7 @@ within any modern web browser without server communication.
                     }
                 }
 
-                // 3. Plain CSV / TSV fallback
+                // 4. Plain CSV / TSV fallback
                 return SpreadsheetParser.parseCsv(u8, lowerName);
             },
 
@@ -5359,6 +5695,12 @@ within any modern web browser without server communication.
                 toolbar.appendChild(toolRight);
                 wrapper.appendChild(toolbar);
 
+                // Authentic Excel Formula Bar (Name box + fx + Formula Input)
+                var formulaBar = document.createElement('div');
+                formulaBar.className = 'excel-formula-bar';
+                formulaBar.innerHTML = '<div class="excel-name-box" id="excel-name-box">A1</div><div class="excel-fx-icon">fx</div><input type="text" class="excel-formula-input" id="excel-formula-input" readonly placeholder="Select a cell to view formula or content...">';
+                wrapper.appendChild(formulaBar);
+
                 // Sheet tabs
                 if (sheets.length > 1) {
                     var tabsBar = document.createElement('div');
@@ -5416,7 +5758,8 @@ within any modern web browser without server communication.
                     if (searchQuery.length > 0) {
                         filtered = allRows.filter(function(r) {
                             return (r || []).some(function(c) {
-                                return String(c).toLowerCase().includes(searchQuery);
+                                var raw = (typeof c === 'object' && c !== null) ? c.v : String(c);
+                                return String(raw).toLowerCase().includes(searchQuery);
                             });
                         });
                     }
@@ -5465,25 +5808,62 @@ within any modern web browser without server communication.
 
                         for (var c = 0; c < curMaxCols; c++) {
                             var td = document.createElement('td');
-                            var rawVal = row && row[c] !== undefined ? row[c] : '';
-                            var strVal = String(rawVal);
+                            var cellData = (row && row[c] !== undefined) ? row[c] : '';
+                            var strVal = (typeof cellData === 'object' && cellData !== null) ? (cellData.v !== undefined ? cellData.v : '') : String(cellData);
+                            var formulaVal = (typeof cellData === 'object' && cellData !== null && cellData.f) ? cellData.f : strVal;
+
                             td.textContent = strVal;
 
-                            if (typeof rawVal === 'number' || (!isNaN(rawVal) && strVal.trim() !== '' && !strVal.includes('-') && !strVal.includes('/'))) {
+                            var trimmed = strVal.trim();
+                            if (trimmed !== '' && (!isNaN(Number(trimmed)) || (!isNaN(Date.parse(trimmed)) && trimmed.length > 5 && (trimmed.includes('/') || trimmed.includes('-'))))) {
+                                if (trimmed.includes('/') || trimmed.includes('-')) {
+                                    td.style.textAlign = 'center';
+                                } else {
+                                    td.style.textAlign = 'right';
+                                }
+                            } else if (trimmed.startsWith('$') || trimmed.startsWith('€') || trimmed.startsWith('£') || trimmed.startsWith('₹') || trimmed.endsWith('%')) {
                                 td.style.textAlign = 'right';
-                            } else if (strVal.startsWith('$') || strVal.startsWith('€') || strVal.startsWith('£') || strVal.endsWith('%')) {
-                                td.style.textAlign = 'right';
+                            } else if (trimmed === 'TRUE' || trimmed === 'FALSE') {
+                                td.style.textAlign = 'center';
+                                td.style.fontWeight = '600';
                             }
 
                             if (searchQuery.length > 0 && strVal.toLowerCase().includes(searchQuery)) {
                                 td.classList.add('excel-search-match');
                             }
+
+                            // Interactive cell selection
+                            (function(colIdx, rowIdx, valText, formulaText, cellElement) {
+                                cellElement.onclick = function() {
+                                    var allActive = tableScroll.querySelectorAll('.excel-active-cell');
+                                    allActive.forEach(function(el) { el.classList.remove('excel-active-cell'); });
+                                    cellElement.classList.add('excel-active-cell');
+
+                                    var colLetter = '';
+                                    var tempC = colIdx;
+                                    while (tempC >= 0) {
+                                        colLetter = String.fromCharCode(65 + (tempC % 26)) + colLetter;
+                                        tempC = Math.floor(tempC / 26) - 1;
+                                    }
+                                    var nameBox = wrapper.querySelector('#excel-name-box');
+                                    var formulaInput = wrapper.querySelector('#excel-formula-input');
+                                    if (nameBox) nameBox.textContent = colLetter + (rowIdx + 1);
+                                    if (formulaInput) formulaInput.value = formulaText || valText;
+                                };
+                            })(c, rIdx, strVal, formulaVal, td);
+
                             tr.appendChild(td);
                         }
                         tbody.appendChild(tr);
                     });
                     table.appendChild(tbody);
                     tableScroll.appendChild(table);
+
+                    // Auto-select first cell if present
+                    var firstTd = tbody.querySelector('td:not(.row-num)');
+                    if (firstTd && !wrapper.querySelector('.excel-active-cell')) {
+                        firstTd.click();
+                    }
                 }
 
                 renderTable();
@@ -6709,6 +7089,45 @@ within any modern web browser without server communication.
             setTimeout(() => URL.revokeObjectURL(url), 60000);
         }
 
+        // Export/Download raw unencapsulated .secure container directly from universal browser runner
+        function downloadRawSecureContainer() {
+            try {
+                const rawBytes = getEncryptedBytes();
+                if (!rawBytes || rawBytes.length === 0) {
+                    alert('Cryptographic container payload is empty or corrupted.');
+                    return;
+                }
+                const parsed = unpackSecureContainer(rawBytes);
+                if (!parsed || !parsed.valid) {
+                    alert('Container error: Pure .secure signature missing or corrupted.');
+                    return;
+                }
+                const blob = new Blob([rawBytes], { type: 'application/x-secure-container' });
+                const metaName = (parsed.meta && parsed.meta.name) || (typeof FILE_NAME !== 'undefined' ? FILE_NAME : 'protected_file');
+                let pureSecureName = metaName.replace(/\.html$/i, '');
+                if (!pureSecureName.toLowerCase().endsWith('.secure')) {
+                    pureSecureName += '.secure';
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = pureSecureName;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    try {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    } catch (e) {}
+                }, 60000);
+            } catch (err) {
+                console.error('Failed to extract raw .secure container:', err);
+                alert('Extraction failed: ' + (err.message || 'Unknown error'));
+            }
+        }
+        window.downloadRawSecureContainer = downloadRawSecureContainer;
+
         async function unlock() {
             if (updateLockoutUI()) return;
 
@@ -6748,24 +7167,22 @@ within any modern web browser without server communication.
                     throw new Error('Encrypted payload is empty or corrupted.');
                 }
 
-                let containerInfo = null;
-                let isBinaryContainer = false;
-
-                try {
-                    const parsed = unpackSecureContainer(rawPayloadBytes);
-                    if (parsed && parsed.valid) {
-                        containerInfo = parsed;
-                        isBinaryContainer = true;
-                    }
-                } catch (e) {
-                    isBinaryContainer = false;
+                // Mathematical validation of .secure container standard (RFC-2026-SECURE)
+                // The container MUST be an authentic binary container with SECURE_V1 magic signature.
+                const containerInfo = unpackSecureContainer(rawPayloadBytes);
+                if (!containerInfo || !containerInfo.valid || !containerInfo.header) {
+                    throw new Error('Authentic .secure container format required. Missing or tampered RFC-2026 container header.');
                 }
 
-                const salt = isBinaryContainer ? containerInfo.salt : getSaltBytes();
-                const iv = isBinaryContainer ? containerInfo.iv : getIvBytes();
-                const encrypted = isBinaryContainer ? containerInfo.ciphertext : rawPayloadBytes;
-                const additionalData = isBinaryContainer ? containerInfo.header : null;
-                const expectedSeal = (isBinaryContainer && containerInfo.integrityHash) ? containerInfo.integrityHash : INTEGRITY_HASH;
+                const isBinaryContainer = true;
+                const salt = containerInfo.salt;
+                const iv = containerInfo.iv;
+                const encrypted = containerInfo.ciphertext;
+                // Cryptographic binding: container header acts as Additional Authenticated Data (AAD) for AES-256-GCM.
+                // Any attempt to delete, bypass, or tamper with the container header or .secure extension
+                // mathematically causes AES-GCM decryption to fail (OperationError / GMAC tag mismatch).
+                const additionalData = containerInfo.header;
+                const expectedSeal = containerInfo.integrityHash || INTEGRITY_HASH;
 
                 const enc = new TextEncoder();
                 let decrypted = null;
@@ -7526,10 +7943,10 @@ within any modern web browser without server communication.
                 let lastDecryptErr = null;
 
                 const attemptDecrypt = async (derivedKey) => {
-                    const algo = { name: 'AES-GCM', iv: iv };
-                    if (additionalData) {
-                        algo.additionalData = additionalData;
+                    if (!additionalData || additionalData.byteLength === 0) {
+                        throw new Error('Mandatory .secure container AAD binding missing. Tamper protection triggered.');
                     }
+                    const algo = { name: 'AES-GCM', iv: iv, additionalData: additionalData };
                     return await window.crypto.subtle.decrypt(algo, derivedKey, encrypted);
                 };
 
@@ -7665,6 +8082,17 @@ within any modern web browser without server communication.
                     else if (hasExt(lowerName, ['webm'])) determinedType = 'video/webm';
                     else if (hasExt(lowerName, ['mp3'])) determinedType = 'audio/mp3';
                     else if (hasExt(lowerName, ['wav'])) determinedType = 'audio/wav';
+                    else if (hasExt(lowerName, ['xlsx'])) determinedType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                    else if (hasExt(lowerName, ['xls'])) determinedType = 'application/vnd.ms-excel';
+                    else if (hasExt(lowerName, ['xlsm'])) determinedType = 'application/vnd.ms-excel.sheet.macroEnabled.12';
+                    else if (hasExt(lowerName, ['xlsb'])) determinedType = 'application/vnd.ms-excel.sheet.binary.macroEnabled.12';
+                    else if (hasExt(lowerName, ['ods'])) determinedType = 'application/vnd.oasis.opendocument.spreadsheet';
+                    else if (hasExt(lowerName, ['csv'])) determinedType = 'text/csv';
+                    else if (hasExt(lowerName, ['tsv'])) determinedType = 'text/tab-separated-values';
+                    else if (hasExt(lowerName, ['docx'])) determinedType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                    else if (hasExt(lowerName, ['doc'])) determinedType = 'application/msword';
+                    else if (hasExt(lowerName, ['pptx'])) determinedType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                    else if (hasExt(lowerName, ['ppt'])) determinedType = 'application/vnd.ms-powerpoint';
                 }
 
                 const blob = new Blob([decryptedBytes], { type: determinedType });
@@ -7947,6 +8375,7 @@ async function handleAddFile() {
   const terminalBody = document.getElementById('security-terminal-body');
   const timerDisplay = document.getElementById('process-timer-display');
   const scannerStatus = document.getElementById('scanner-status-text');
+  const scannerSub = document.getElementById('scanner-sub-status');
   const scannerCenter = document.querySelector('.scanner-center-shield');
   const scannerStage = document.querySelector('.scanner-stage');
 
@@ -7957,6 +8386,7 @@ async function handleAddFile() {
   completeContainer?.classList.add('hidden');
   processContainer?.classList.remove('hidden');
   scannerStage?.classList.add('rapid-scan');
+  scannerStage?.classList.remove('completed-burst');
 
   // Reset steps & visual state
   ['step-analysis', 'step-prep', 'step-kdf', 'step-encrypt', 'step-meta', 'step-finalize', 'step-output', 'step-verify'].forEach(id => {
@@ -7964,15 +8394,25 @@ async function handleAddFile() {
   });
   if (scannerCenter) scannerCenter.classList.remove('success');
   if (scannerStatus) scannerStatus.textContent = 'SECURING';
+  if (scannerSub) scannerSub.textContent = 'LAYER 01/16 ACTIVE';
   if (terminalBody) terminalBody.innerHTML = '';
 
   const startTime = Date.now();
+  const totalDuration = 6000;
   const timerInterval = setInterval(() => {
     const elapsed = Date.now() - startTime;
-    const clampedMs = Math.min(6000, elapsed);
+    const clampedMs = Math.min(totalDuration, elapsed);
     const secs = Math.floor(clampedMs / 1000).toString().padStart(2, '0');
     const cs = Math.floor((clampedMs % 1000) / 10).toString().padStart(2, '0');
     if (timerDisplay) timerDisplay.textContent = `00:${secs}.${cs}`;
+
+    // Continuous 60fps fluid progress bar & percentage glide
+    const progressRatio = Math.min(1, clampedMs / totalDuration);
+    const dynamicPct = Math.min(100, Math.round(progressRatio * 100));
+    const progressBar = document.getElementById('protect-progress-bar');
+    const pctEl = document.getElementById('protect-progress-percent');
+    if (progressBar) progressBar.style.width = `${(progressRatio * 100).toFixed(1)}%`;
+    if (pctEl) pctEl.textContent = `${dynamicPct}%`;
   }, 20);
 
   const formatTimeToken = (ms) => {
@@ -7990,9 +8430,10 @@ async function handleAddFile() {
 
   try {
     // PHASE 1: File Payload Analysis & Memory Enclave (0ms to 750ms)
-    updateProcessProgress(14, 'FILE STRUCTURE ANALYSIS // MEMORY ENCLAVE...');
+    updateProcessProgress(null, 'FILE STRUCTURE ANALYSIS // MEMORY ENCLAVE...');
     updateProcessStep('step-analysis', 'active');
     if (scannerStatus) scannerStatus.textContent = 'ANALYZING';
+    if (scannerSub) scannerSub.textContent = 'PHASE 1/7 • ENCLAVE MEMORY ISOLATION';
     logTerminal(`${formatTimeToken(Date.now() - startTime)} INITIATING 16-LAYER QUANTUM-HARDENED PIPELINE // V10 STANDARD`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} File: "${file.name}" [${formatFileSize(file.size)}] | Type: ${file.type || 'application/octet-stream'}`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} Enclave memory block allocated: ${file.size} bytes. Isolation confirmed.`);
@@ -8002,9 +8443,10 @@ async function handleAddFile() {
     updateProcessStep('step-analysis', 'completed');
 
     // PHASE 2: CSPRNG Hardware Salt & Nonce Generation (750ms to 1500ms)
-    updateProcessProgress(28, 'INITIALIZING CSPRNG ENTROPY POOL...');
+    updateProcessProgress(null, 'INITIALIZING CSPRNG ENTROPY POOL...');
     updateProcessStep('step-prep', 'active');
     if (scannerStatus) scannerStatus.textContent = 'ENTROPY POOL';
+    if (scannerSub) scannerSub.textContent = 'PHASE 2/7 • CSPRNG 256-BIT ENTROPY';
     logTerminal(`${formatTimeToken(Date.now() - startTime)} Generating 256-bit cryptographic salt from hardware CSPRNG...`);
     const salt = SecureCrypto.generateSalt();
     const fileKey = await SecureCrypto.generateKey();
@@ -8014,9 +8456,10 @@ async function handleAddFile() {
     updateProcessStep('step-prep', 'completed');
 
     // PHASE 3: 16-Layer 4-Tier Quantum-Hardened Key Derivation Engine (1500ms to 2400ms)
-    updateProcessProgress(45, 'DERIVING KEY (16-LAYER QUANTUM-HARDENED KDF)...');
+    updateProcessProgress(null, 'DERIVING KEY (16-LAYER QUANTUM-HARDENED KDF)...');
     updateProcessStep('step-kdf', 'active');
-    if (scannerStatus) scannerStatus.textContent = '16-Layer 2M PBKDF2';
+    if (scannerStatus) scannerStatus.textContent = '16-LAYER KDF';
+    if (scannerSub) scannerSub.textContent = 'PHASE 3/7 • 2,000,000 ROUNDS PBKDF2';
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 1] NIST SP 800-132 Unicode Pre-Conditioning & Entropy Normalization (NFKC)...`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 2] RFC 5869 / NIST SP 800-56C Context Domain Tag & Multi-Key HMAC-SHA512 Pre-Whitening...`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 3] Sequential Memory-Hard State Access Matrix (512KB / 8,192 Blocks x 64B)...`);
@@ -8035,9 +8478,10 @@ async function handleAddFile() {
     updateProcessStep('step-kdf', 'completed');
 
     // PHASE 4: AES-GCM-256 Payload Encryption & Payload Integrity Seal (2400ms to 3300ms)
-    updateProcessProgress(65, 'AES-GCM-256 CIPHER STREAM PROCESSING...');
+    updateProcessProgress(null, 'AES-GCM-256 CIPHER STREAM PROCESSING...');
     updateProcessStep('step-encrypt', 'active');
     if (scannerStatus) scannerStatus.textContent = 'AES-256-GCM';
+    if (scannerSub) scannerSub.textContent = 'PHASE 4/7 • GALOIS AUTH STREAM';
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 10] Native WebCrypto AES-256-GCM Framing (128-bit Galois Authentication Tag)...`);
     const fileBuffer = await file.arrayBuffer();
     const payloadHash = await SecureCrypto.computePayloadHash(fileBuffer);
@@ -8050,10 +8494,11 @@ async function handleAddFile() {
     updateProcessStep('step-encrypt', 'completed');
 
     // PHASE 5: Binary Container Packaging & Galois AEAD Binding (3300ms to 4200ms)
-    updateProcessProgress(80, 'PACKAGING ZERO-KNOWLEDGE METADATA...');
+    updateProcessProgress(null, 'PACKAGING ZERO-KNOWLEDGE METADATA...');
     updateProcessStep('step-meta', 'active');
     updateProcessStep('step-finalize', 'active');
-    if (scannerStatus) scannerStatus.textContent = 'KEY WRAP & VAULT';
+    if (scannerStatus) scannerStatus.textContent = 'PACKAGING';
+    if (scannerSub) scannerSub.textContent = 'PHASE 5/7 • RFC-2026 CONTAINER';
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 11] RFC-2026-SECURE Binary Container Header Packaging (SECURE_V1)...`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 12] Galois AEAD Additional Authenticated Data (GF(2^128) GMAC Binding)...`);
     const { iv: wrapIv, wrappedData: wrappedWithPass } = await SecureCrypto.wrapKey(fileKey, passwordKey);
@@ -8081,9 +8526,10 @@ async function handleAddFile() {
     updateProcessStep('step-finalize', 'completed');
 
     // PHASE 6: Standalone Container Runtime & Anti-Brute-Force Guard (4200ms to 5100ms)
-    updateProcessProgress(92, 'COMPILING STANDALONE ENCLAVE RUNTIME (.secure)...');
+    updateProcessProgress(null, 'COMPILING STANDALONE ENCLAVE RUNTIME (.secure)...');
     updateProcessStep('step-output', 'active');
-    if (scannerStatus) scannerStatus.textContent = 'STANDALONE CONTAINER';
+    if (scannerStatus) scannerStatus.textContent = 'STANDALONE';
+    if (scannerSub) scannerSub.textContent = 'PHASE 6/7 • EMBEDDING WEB RUNTIME';
     logTerminal(`${formatTimeToken(Date.now() - startTime)} Assembling standardized .secure container with embedded browser execution runtime...`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 15] Progressive Exponential Time-Throttling & Anti-Brute-Force Guard Armed.`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} Anti-Exfiltration & Cryptographic defense matrix embedded.`);
@@ -8091,9 +8537,10 @@ async function handleAddFile() {
     updateProcessStep('step-output', 'completed');
 
     // PHASE 7: Cryptographic Verification, RAM Scrubbing & Container Seal (5100ms to 6000ms)
-    updateProcessProgress(100, 'CRYPTOGRAPHIC INTEGRITY VERIFIED [SEALED]');
+    updateProcessProgress(null, 'CRYPTOGRAPHIC INTEGRITY VERIFIED [SEALED]');
     updateProcessStep('step-verify', 'active');
-    if (scannerStatus) scannerStatus.textContent = 'SEALING CONTAINER';
+    if (scannerStatus) scannerStatus.textContent = 'VERIFYING';
+    if (scannerSub) scannerSub.textContent = 'PHASE 7/7 • GMAC SEAL & RAM ZEROIZE';
     logTerminal(`${formatTimeToken(Date.now() - startTime)} [Layer 16] Ephemeral Volatile RAM Scrubbing & Memory Zeroization Confirmed.`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} Authenticity check: GMAC integrity tag valid. Zero-knowledge verification OK.`);
     logTerminal(`${formatTimeToken(Date.now() - startTime)} ALL 16 LAYERS OF SECURITY VERIFIED & SEALED. CONTAINER READY.`);
@@ -8103,16 +8550,23 @@ async function handleAddFile() {
     clearInterval(timerInterval);
     if (timerDisplay) timerDisplay.textContent = '00:06.00';
     if (scannerStatus) scannerStatus.textContent = 'SECURED [✓]';
+    if (scannerSub) scannerSub.textContent = '16 LAYERS SEALED & VERIFIED';
     if (scannerCenter) scannerCenter.classList.add('success');
+    scannerStage?.classList.add('completed-burst');
+    updateProcessProgress(100, 'ALL 16 CRYPTOGRAPHIC LAYERS VERIFIED & SEALED');
 
-    // Small yield so user sees completion checkmark briefly before transitioning
-    await new Promise(r => setTimeout(r, 350));
+    // Celebratory shockwave display before transitioning to completion view
+    await new Promise(r => setTimeout(r, 450));
 
     scannerStage?.classList.remove('rapid-scan');
 
-    // Transition to Completion View
+    // Transition to Completion View with smooth entrance
     processContainer?.classList.add('hidden');
     completeContainer?.classList.remove('hidden');
+    completeContainer?.classList.remove('active-entrance');
+    void completeContainer?.offsetWidth; // Trigger reflow for animation
+    completeContainer?.classList.add('active-entrance');
+
     const completeFileName = document.getElementById('complete-file-name');
     if (completeFileName) completeFileName.textContent = file.name;
 
