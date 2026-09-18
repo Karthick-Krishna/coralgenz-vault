@@ -100,11 +100,22 @@ html {
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
   color-scheme: dark;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
   min-height: 100vh;
   background-color: var(--cyber-bg-root);
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* Crisp GPU-accelerated fixed background on dedicated compositor layer (eliminates scroll jank) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
   background-image: 
     radial-gradient(circle at 15% 15%, rgba(0, 245, 255, 0.07) 0%, transparent 45%),
     radial-gradient(circle at 85% 75%, rgba(168, 85, 247, 0.06) 0%, transparent 45%),
@@ -112,14 +123,10 @@ body {
     radial-gradient(rgba(0, 245, 255, 0.035) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
   background-position: 0 0, 0 0, 0 0, 0 0;
-  background-attachment: fixed;
-  overflow-x: hidden;
-  line-height: 1.5;
-}
-
-/* Crisp display rendering (scanlines removed for original 100% quality) */
-body::before {
-  display: none;
+  pointer-events: none;
+  z-index: 0;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 /* Ambient Matrix / Cyber Background Canvas */
@@ -132,6 +139,8 @@ body::before {
   pointer-events: none;
   z-index: 0;
   opacity: 0.22;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .cyber-grid-overlay {
@@ -147,6 +156,8 @@ body::before {
   pointer-events: none;
   z-index: 1;
   opacity: 0.85;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 #app {
@@ -201,6 +212,8 @@ body::before {
   justify-content: space-between;
   padding: 0 28px;
   transition: all 0.3s ease;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .logo {
@@ -3495,6 +3508,8 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
 }
 
 .cyber-toolbar {
@@ -3637,6 +3652,9 @@ body::before {
   transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
 }
 
 .file-card::before {
@@ -4863,6 +4881,66 @@ body::before {
   background: #fef08a !important;
   color: #854d0e !important;
   font-weight: 700 !important;
+}
+
+.excel-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border-top: 1px solid #cbd5e1;
+  padding: 0 8px;
+  min-height: 34px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 12px;
+  z-index: 15;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.excel-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.excel-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  background: #e2e8f0;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.excel-tab-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.excel-tab-item.active {
+  background: #ffffff;
+  color: #107c41;
+  font-weight: 700;
+  border-bottom: 3px solid #107c41;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.excel-status-info {
+  font-size: 11px;
+  color: #64748b;
+  padding-right: 8px;
+  white-space: nowrap;
 }
 
 .word-document {

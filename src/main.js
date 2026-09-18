@@ -1216,31 +1216,13 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
         sheetNames.forEach(sName => {
           const ws = workbook.Sheets[sName];
           if (ws) {
+            // Also extract formatted rows for fast search & fallback
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-            let maxCols = 0;
-            rows.forEach(r => { if (r && r.length > maxCols) maxCols = r.length; });
-
-            const enrichedRows = rows.map((r, rIdx) => {
-              const rowArr = [];
-              for (let c = 0; c < maxCols; c++) {
-                const dispVal = (r && r[c] !== undefined) ? String(r[c]) : '';
-                let cellCoord = '';
-                let tempC = c;
-                while (tempC >= 0) {
-                  cellCoord = String.fromCharCode(65 + (tempC % 26)) + cellCoord;
-                  tempC = Math.floor(tempC / 26) - 1;
-                }
-                cellCoord += (rIdx + 1);
-                const cellObj = ws[cellCoord];
-                const formulaStr = (cellObj && cellObj.f) ? ('=' + cellObj.f) : dispVal;
-                rowArr.push({ v: dispVal, f: formulaStr });
-              }
-              return rowArr;
+            sheets.push({
+              name: sName,
+              ws: ws,
+              rows: rows
             });
-
-            if (enrichedRows.length > 0) {
-              sheets.push({ name: sName, rows: enrichedRows });
-            }
           }
         });
       } catch (e) {
@@ -1330,9 +1312,16 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
     const renderUI = () => {
       viewer.innerHTML = '';
       const currentSheet = sheets[activeSheetIdx] || { rows: [] };
-      const rows = currentSheet.rows || [];
-      let maxCols = 0;
-      rows.forEach(r => { if (r && r.length > maxCols) maxCols = r.length; });
+      let totalRows = 0;
+      let totalCols = 0;
+      if (currentSheet.ws && currentSheet.ws['!ref'] && typeof XLSX !== 'undefined' && XLSX.utils) {
+        const r = XLSX.utils.decode_range(currentSheet.ws['!ref']);
+        totalRows = r.e.r - r.s.r + 1;
+        totalCols = r.e.c - r.s.c + 1;
+      } else if (currentSheet.rows) {
+        totalRows = currentSheet.rows.length;
+        currentSheet.rows.forEach(r => { if (r && r.length > totalCols) totalCols = r.length; });
+      }
 
       // 1. Toolbar
       const toolbar = document.createElement('div');
@@ -1346,7 +1335,7 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
           EXCEL SPREADSHEET
         </span>
         <span style="font-size:13px;font-weight:600;color:var(--text-main);">${escapeHtmlApp(customFileName)}</span>
-        <span class="excel-stats-pill">${rows.length} Rows &times; ${maxCols} Cols</span>
+        <span class="excel-stats-pill">${totalRows} Rows &times; ${totalCols} Cols</span>
       `;
 
       const toolRight = document.createElement('div');
@@ -1406,26 +1395,7 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
         }
       };
 
-      // 2. Sheet Tabs
-      if (sheets.length > 1) {
-        const header = document.createElement('div');
-        header.className = 'excel-header';
-        sheets.forEach((sh, idx) => {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = `excel-sheet-btn ${idx === activeSheetIdx ? 'active' : ''}`;
-          btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ${escapeHtmlApp(sh.name)} <span style="opacity:0.7;font-size:10px;">(${sh.rows ? sh.rows.length : 0})</span>`;
-          btn.onclick = () => {
-            activeSheetIdx = idx;
-            searchQuery = '';
-            renderUI();
-          };
-          header.appendChild(btn);
-        });
-        viewer.appendChild(header);
-      }
-
-      // 3. Table Wrapper
+      // 2. Table Wrapper
       const tableWrapper = document.createElement('div');
       tableWrapper.className = 'excel-table-wrapper';
       viewer.appendChild(tableWrapper);
@@ -1441,112 +1411,249 @@ function renderExcelToHTML(arrayBuffer, container, customFileName = 'Spreadsheet
 
       function renderTable() {
         tableWrapper.innerHTML = '';
-        let filtered = currentSheet.rows || [];
-        if (searchQuery.trim().length > 0) {
-          filtered = filtered.filter(r => (r || []).some(c => {
-            const rawVal = (typeof c === 'object' && c !== null) ? c.v : String(c);
-            return String(rawVal).toLowerCase().includes(searchQuery);
-          }));
-        }
 
-        if (filtered.length === 0) {
-          tableWrapper.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#94a3b8;font-size:14px;font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif;">No matching rows found in this sheet.</div>';
-          return;
-        }
+        if (currentSheet.ws && typeof XLSX !== 'undefined' && XLSX.utils && XLSX.utils.sheet_to_html) {
+          const ws = currentSheet.ws;
+          const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+          const totalCols = Math.max(1, range.e.c - range.s.c + 1);
+          const totalRows = Math.max(1, range.e.r - range.s.r + 1);
 
-        let curMaxCols = 0;
-        filtered.forEach(r => { if (r && r.length > curMaxCols) curMaxCols = r.length; });
-        if (curMaxCols === 0) curMaxCols = 1;
-
-        const table = document.createElement('table');
-        table.className = 'excel-table';
-        if (currentZoom !== 100) table.style.zoom = currentZoom / 100;
-
-        const thead = document.createElement('thead');
-        const hdrTr = document.createElement('tr');
-        const cornerTh = document.createElement('th');
-        cornerTh.className = 'row-index-hdr';
-        cornerTh.textContent = '#';
-        hdrTr.appendChild(cornerTh);
-
-        for (let c = 0; c < curMaxCols; c++) {
-          const th = document.createElement('th');
-          let colName = '';
-          let temp = c;
-          while (temp >= 0) {
-            colName = String.fromCharCode(65 + (temp % 26)) + colName;
-            temp = Math.floor(temp / 26) - 1;
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = XLSX.utils.sheet_to_html(ws, { id: 'inapp-excel-grid', header: '', footer: '' });
+          const table = tempDiv.querySelector('table');
+          if (!table) {
+            tableWrapper.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#94a3b8;font-size:14px;font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif;">(Empty spreadsheet)</div>';
+            return;
           }
-          th.textContent = colName;
-          hdrTr.appendChild(th);
-        }
-        thead.appendChild(hdrTr);
-        table.appendChild(thead);
+          table.className = 'excel-table';
+          if (currentZoom !== 100) table.style.zoom = currentZoom / 100;
 
-        const tbody = document.createElement('tbody');
-        filtered.forEach((row, rIdx) => {
-          const tr = document.createElement('tr');
-          const rowNumTd = document.createElement('td');
-          rowNumTd.className = 'row-num';
-          rowNumTd.textContent = (rIdx + 1);
-          tr.appendChild(rowNumTd);
+          // Authentic Column Widths via <colgroup>
+          const colgroup = document.createElement('colgroup');
+          const rowNumCol = document.createElement('col');
+          rowNumCol.style.width = '46px';
+          colgroup.appendChild(rowNumCol);
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            const col = document.createElement('col');
+            const colInfo = (ws['!cols'] || [])[c];
+            const wPx = (colInfo && colInfo.wpx) ? colInfo.wpx : ((colInfo && colInfo.wch) ? Math.round(colInfo.wch * 8.5) : 100);
+            col.style.width = Math.max(45, wPx) + 'px';
+            colgroup.appendChild(col);
+          }
+          table.insertBefore(colgroup, table.firstChild);
+
+          // Authentic Header Row with Column Letters (A, B, C, ...)
+          const thead = document.createElement('thead');
+          const hdrTr = document.createElement('tr');
+          const cornerTh = document.createElement('th');
+          cornerTh.className = 'row-index-hdr';
+          cornerTh.textContent = '#';
+          hdrTr.appendChild(cornerTh);
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            const th = document.createElement('th');
+            th.textContent = XLSX.utils.encode_col(c);
+            hdrTr.appendChild(th);
+          }
+          thead.appendChild(hdrTr);
+          table.insertBefore(thead, colgroup.nextSibling || table.firstChild);
+
+          // Inject Row Numbers (1, 2, 3, ...) and wire up cell interactions
+          const trs = table.querySelectorAll('tbody tr, tr:not(thead tr)');
+          trs.forEach((tr, rIdx) => {
+            const excelRowNum = range.s.r + rIdx + 1;
+            const rowNumTd = document.createElement('td');
+            rowNumTd.className = 'row-num';
+            rowNumTd.textContent = String(excelRowNum);
+            tr.insertBefore(rowNumTd, tr.firstChild);
+
+            tr.querySelectorAll('td:not(.row-num)').forEach(td => {
+              const cellCoord = td.id.replace(/^inapp-excel-grid-/, '').replace(/^sjs-/, '');
+              const cell = ws[cellCoord];
+              if (cell) {
+                if (cell.f) td.setAttribute('data-formula', '=' + cell.f);
+                if (cell.w) td.textContent = cell.w;
+              }
+
+              // Authentic Alignment
+              const cellType = td.getAttribute('data-t');
+              const txt = (td.textContent || '').trim();
+              if (cellType === 'n' || (!isNaN(Number(txt)) && txt !== '') || txt.startsWith('$') || txt.startsWith('€') || txt.startsWith('£') || txt.startsWith('₹') || txt.endsWith('%')) {
+                td.style.textAlign = 'right';
+              } else if (cellType === 'd' || cellType === 'b' || txt === 'TRUE' || txt === 'FALSE') {
+                td.style.textAlign = 'center';
+                if (txt === 'TRUE' || txt === 'FALSE') td.style.fontWeight = '600';
+              } else {
+                td.style.textAlign = 'left';
+              }
+
+              // Search highlight
+              if (searchQuery && td.textContent.toLowerCase().includes(searchQuery)) {
+                td.classList.add('excel-search-match');
+              }
+
+              // Interactive cell selection
+              td.onclick = () => {
+                tableWrapper.querySelectorAll('.excel-active-cell').forEach(el => el.classList.remove('excel-active-cell'));
+                td.classList.add('excel-active-cell');
+                const nameBox = viewer.querySelector('#inapp-name-box');
+                const formulaInput = viewer.querySelector('#inapp-formula-input');
+                if (nameBox) nameBox.textContent = cellCoord;
+                const fVal = td.getAttribute('data-formula') || td.textContent || '';
+                if (formulaInput) formulaInput.value = fVal;
+              };
+            });
+          });
+
+          tableWrapper.appendChild(table);
+
+          // Auto-select first cell
+          const firstTd = table.querySelector('tbody td:not(.row-num), tr td:not(.row-num)');
+          if (firstTd) firstTd.click();
+
+        } else {
+          // Fallback array rendering
+          let filtered = currentSheet.rows || [];
+          if (searchQuery.trim().length > 0) {
+            filtered = filtered.filter(r => (r || []).some(c => {
+              const rawVal = (typeof c === 'object' && c !== null) ? c.v : String(c);
+              return String(rawVal).toLowerCase().includes(searchQuery);
+            }));
+          }
+
+          if (filtered.length === 0) {
+            tableWrapper.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#94a3b8;font-size:14px;font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif;">No matching rows found in this sheet.</div>';
+            return;
+          }
+
+          let curMaxCols = 0;
+          filtered.forEach(r => { if (r && r.length > curMaxCols) curMaxCols = r.length; });
+          if (curMaxCols === 0) curMaxCols = 1;
+
+          const table = document.createElement('table');
+          table.className = 'excel-table';
+          if (currentZoom !== 100) table.style.zoom = currentZoom / 100;
+
+          const thead = document.createElement('thead');
+          const hdrTr = document.createElement('tr');
+          const cornerTh = document.createElement('th');
+          cornerTh.className = 'row-index-hdr';
+          cornerTh.textContent = '#';
+          hdrTr.appendChild(cornerTh);
 
           for (let c = 0; c < curMaxCols; c++) {
-            const td = document.createElement('td');
-            const cellData = row && row[c] !== undefined ? row[c] : '';
-            const strVal = (typeof cellData === 'object' && cellData !== null) ? (cellData.v !== undefined ? cellData.v : '') : String(cellData);
-            const formulaVal = (typeof cellData === 'object' && cellData !== null && cellData.f) ? cellData.f : strVal;
-            td.textContent = strVal;
-
-            const trimmed = strVal.trim();
-            if (trimmed !== '' && (!isNaN(Number(trimmed)) || (!isNaN(Date.parse(trimmed)) && trimmed.length > 5 && (trimmed.includes('/') || trimmed.includes('-'))))) {
-              if (trimmed.includes('/') || trimmed.includes('-')) {
-                td.style.textAlign = 'center';
-              } else {
-                td.style.textAlign = 'right';
-              }
-            } else if (trimmed.startsWith('$') || trimmed.startsWith('€') || trimmed.startsWith('£') || trimmed.startsWith('₹') || trimmed.endsWith('%')) {
-              td.style.textAlign = 'right';
-            } else if (trimmed === 'TRUE' || trimmed === 'FALSE') {
-              td.style.textAlign = 'center';
-              td.style.fontWeight = '600';
+            const th = document.createElement('th');
+            let colName = '';
+            let temp = c;
+            while (temp >= 0) {
+              colName = String.fromCharCode(65 + (temp % 26)) + colName;
+              temp = Math.floor(temp / 26) - 1;
             }
-
-            if (searchQuery && strVal.toLowerCase().includes(searchQuery)) {
-              td.classList.add('excel-search-match');
-            }
-
-            // Interactive cell selection
-            td.onclick = () => {
-              tableWrapper.querySelectorAll('.excel-active-cell').forEach(el => el.classList.remove('excel-active-cell'));
-              td.classList.add('excel-active-cell');
-              let colLetter = '';
-              let tempC = c;
-              while (tempC >= 0) {
-                colLetter = String.fromCharCode(65 + (tempC % 26)) + colLetter;
-                tempC = Math.floor(tempC / 26) - 1;
-              }
-              const nameBox = viewer.querySelector('#inapp-name-box');
-              const formulaInput = viewer.querySelector('#inapp-formula-input');
-              if (nameBox) nameBox.textContent = colLetter + (rIdx + 1);
-              if (formulaInput) formulaInput.value = formulaVal || strVal;
-            };
-
-            tr.appendChild(td);
+            th.textContent = colName;
+            hdrTr.appendChild(th);
           }
-          tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-        tableWrapper.appendChild(table);
+          thead.appendChild(hdrTr);
+          table.appendChild(thead);
 
-        // Auto-select first cell if present
-        const firstTd = tbody.querySelector('td:not(.row-num)');
-        if (firstTd && !viewer.querySelector('.excel-active-cell')) {
-          firstTd.click();
+          const tbody = document.createElement('tbody');
+          filtered.forEach((row, rIdx) => {
+            const tr = document.createElement('tr');
+            const rowNumTd = document.createElement('td');
+            rowNumTd.className = 'row-num';
+            rowNumTd.textContent = String(rIdx + 1);
+            tr.appendChild(rowNumTd);
+
+            for (let c = 0; c < curMaxCols; c++) {
+              const td = document.createElement('td');
+              const cellData = row && row[c] !== undefined ? row[c] : '';
+              const strVal = (typeof cellData === 'object' && cellData !== null) ? (cellData.v !== undefined ? cellData.v : '') : String(cellData);
+              const formulaVal = (typeof cellData === 'object' && cellData !== null && cellData.f) ? cellData.f : strVal;
+              td.textContent = strVal;
+
+              const trimmed = strVal.trim();
+              if (trimmed !== '' && (!isNaN(Number(trimmed)) || (!isNaN(Date.parse(trimmed)) && trimmed.length > 5 && (trimmed.includes('/') || trimmed.includes('-'))))) {
+                if (trimmed.includes('/') || trimmed.includes('-')) {
+                  td.style.textAlign = 'center';
+                } else {
+                  td.style.textAlign = 'right';
+                }
+              } else if (trimmed.startsWith('$') || trimmed.startsWith('€') || trimmed.startsWith('£') || trimmed.startsWith('₹') || trimmed.endsWith('%')) {
+                td.style.textAlign = 'right';
+              } else if (trimmed === 'TRUE' || trimmed === 'FALSE') {
+                td.style.textAlign = 'center';
+                td.style.fontWeight = '600';
+              }
+
+              if (searchQuery && strVal.toLowerCase().includes(searchQuery)) {
+                td.classList.add('excel-search-match');
+              }
+
+              td.onclick = () => {
+                tableWrapper.querySelectorAll('.excel-active-cell').forEach(el => el.classList.remove('excel-active-cell'));
+                td.classList.add('excel-active-cell');
+                let colLetter = '';
+                let tempC = c;
+                while (tempC >= 0) {
+                  colLetter = String.fromCharCode(65 + (tempC % 26)) + colLetter;
+                  tempC = Math.floor(tempC / 26) - 1;
+                }
+                const nameBox = viewer.querySelector('#inapp-name-box');
+                const formulaInput = viewer.querySelector('#inapp-formula-input');
+                if (nameBox) nameBox.textContent = colLetter + (rIdx + 1);
+                if (formulaInput) formulaInput.value = formulaVal || strVal;
+              };
+
+              tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          tableWrapper.appendChild(table);
+
+          const firstTd = tbody.querySelector('td:not(.row-num)');
+          if (firstTd && !viewer.querySelector('.excel-active-cell')) {
+            firstTd.click();
+          }
         }
       }
 
       renderTable();
+
+      // 3. Authentic Excel Bottom Bar: Sheet Tabs & Status
+      const bottomBar = document.createElement('div');
+      bottomBar.className = 'excel-bottom-bar';
+
+      const tabsList = document.createElement('div');
+      tabsList.className = 'excel-tabs-list';
+      sheets.forEach((sh, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `excel-tab-item ${idx === activeSheetIdx ? 'active' : ''}`;
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg> ${escapeHtmlApp(sh.name)}`;
+        btn.onclick = () => {
+          activeSheetIdx = idx;
+          searchQuery = '';
+          renderUI();
+        };
+        tabsList.appendChild(btn);
+      });
+      bottomBar.appendChild(tabsList);
+
+      const statusInfo = document.createElement('div');
+      statusInfo.className = 'excel-status-info';
+      let rCount = 0;
+      let cCount = 0;
+      if (currentSheet.ws && currentSheet.ws['!ref'] && typeof XLSX !== 'undefined' && XLSX.utils) {
+        const r = XLSX.utils.decode_range(currentSheet.ws['!ref']);
+        rCount = r.e.r - r.s.r + 1;
+        cCount = r.e.c - r.s.c + 1;
+      } else if (currentSheet.rows) {
+        rCount = currentSheet.rows.length;
+        cCount = currentSheet.rows[0] ? currentSheet.rows[0].length : 0;
+      }
+      statusInfo.textContent = `Ready • ${rCount} rows, ${cCount} columns`;
+      bottomBar.appendChild(statusInfo);
+
+      viewer.appendChild(bottomBar);
     };
 
     renderUI();
@@ -3978,6 +4085,60 @@ within any modern web browser without server communication.
             color: var(--text-muted);
             font-size: 14px;
         }
+        .excel-bottom-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            border-top: 1px solid #cbd5e1;
+            padding: 0 8px;
+            min-height: 34px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 12px;
+            z-index: 15;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        .excel-tabs-list {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+        .excel-tab-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 16px;
+            background: #e2e8f0;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            font-size: 11.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .excel-tab-item:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        .excel-tab-item.active {
+            background: #ffffff;
+            color: #107c41;
+            font-weight: 700;
+            border-bottom: 3px solid #107c41;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.04);
+        }
+        .excel-status-info {
+            font-size: 11px;
+            color: #64748b;
+            padding-right: 8px;
+            white-space: nowrap;
+        }
 
         /* Word Document Reader Styles */
         .word-scroll-container {
@@ -5215,40 +5376,20 @@ within any modern web browser without server communication.
                         (workbook.SheetNames || []).forEach(function(sName) {
                             var ws = workbook.Sheets[sName];
                             if (ws) {
-                                // Extract rows with raw: false to retain exact Excel-formatted currency, dates, percentages
                                 var rows = xlsxEngine.utils.sheet_to_json(ws, {
                                     header: 1,
                                     defval: '',
                                     raw: false
                                 });
-                                var maxCols = 0;
-                                rows.forEach(function(r) { if (r && r.length > maxCols) maxCols = r.length; });
-
-                                // Build enriched cell data with formula awareness
-                                var enrichedRows = rows.map(function(r, rIdx) {
-                                    var rowArr = [];
-                                    for (var c = 0; c < maxCols; c++) {
-                                        var dispVal = (r && r[c] !== undefined) ? String(r[c]) : '';
-                                        var cellCoord = '';
-                                        var tempC = c;
-                                        while (tempC >= 0) {
-                                            cellCoord = String.fromCharCode(65 + (tempC % 26)) + cellCoord;
-                                            tempC = Math.floor(tempC / 26) - 1;
-                                        }
-                                        cellCoord += (rIdx + 1);
-                                        var cellObj = ws[cellCoord];
-                                        var formulaStr = (cellObj && cellObj.f) ? ('=' + cellObj.f) : dispVal;
-                                        rowArr.push({ v: dispVal, f: formulaStr });
-                                    }
-                                    return rowArr;
+                                sheets.push({
+                                    name: sName,
+                                    ws: ws,
+                                    workbook: workbook,
+                                    rows: rows
                                 });
-
-                                if (enrichedRows.length > 0) {
-                                    sheets.push({ name: sName, rows: enrichedRows });
-                                }
                             }
                         });
-                        if (sheets.length > 0 && sheets.some(function(s) { return s.rows && s.rows.length > 0; })) {
+                        if (sheets.length > 0) {
                             return sheets;
                         }
                     } catch (e) {
@@ -5646,16 +5787,24 @@ within any modern web browser without server communication.
                 wrapper.innerHTML = '';
 
                 var currentSheet = sheets[activeSheetIdx] || { rows: [] };
-                var rowsToDisplay = currentSheet.rows || [];
-                var maxCols = 0;
-                rowsToDisplay.forEach(function(r) { if (r && r.length > maxCols) maxCols = r.length; });
+                var rCount = 0;
+                var cCount = 0;
+                var xlsxEngine = (typeof window !== 'undefined' && window.XLSX) ? window.XLSX : (typeof XLSX !== 'undefined' ? XLSX : null);
+                if (currentSheet.ws && currentSheet.ws['!ref'] && xlsxEngine && xlsxEngine.utils) {
+                    var r = xlsxEngine.utils.decode_range(currentSheet.ws['!ref']);
+                    rCount = Math.max(1, r.e.r - r.s.r + 1);
+                    cCount = Math.max(1, r.e.c - r.s.c + 1);
+                } else if (currentSheet.rows) {
+                    rCount = currentSheet.rows.length;
+                    currentSheet.rows.forEach(function(r) { if (r && r.length > cCount) cCount = r.length; });
+                }
 
                 var toolbar = document.createElement('div');
                 toolbar.className = 'doc-toolbar';
 
                 var toolLeft = document.createElement('div');
                 toolLeft.className = 'doc-toolbar-left';
-                toolLeft.innerHTML = '<span class="doc-format-badge doc-badge-excel"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg> EXCEL SPREADSHEET</span><span class="doc-filename" title="' + escapeHTML(name) + '">' + escapeHTML(name) + '</span><span class="doc-stats-badge">' + rowsToDisplay.length + ' Rows &times; ' + maxCols + ' Cols</span>';
+                toolLeft.innerHTML = '<span class="doc-format-badge doc-badge-excel"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg> EXCEL SPREADSHEET</span><span class="doc-filename" title="' + escapeHTML(name) + '">' + escapeHTML(name) + '</span><span class="doc-stats-badge">' + rCount + ' Rows &times; ' + cCount + ' Cols</span>';
 
                 var toolRight = document.createElement('div');
                 toolRight.className = 'doc-toolbar-right';
@@ -5701,25 +5850,6 @@ within any modern web browser without server communication.
                 formulaBar.innerHTML = '<div class="excel-name-box" id="excel-name-box">A1</div><div class="excel-fx-icon">fx</div><input type="text" class="excel-formula-input" id="excel-formula-input" readonly placeholder="Select a cell to view formula or content...">';
                 wrapper.appendChild(formulaBar);
 
-                // Sheet tabs
-                if (sheets.length > 1) {
-                    var tabsBar = document.createElement('div');
-                    tabsBar.className = 'excel-tabs-bar';
-                    sheets.forEach(function(sh, idx) {
-                        var tabBtn = document.createElement('button');
-                        tabBtn.type = 'button';
-                        tabBtn.className = 'excel-tab-btn' + (idx === activeSheetIdx ? ' active' : '');
-                        tabBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ' + escapeHTML(sh.name) + ' <span class="excel-tab-count">(' + (sh.rows ? sh.rows.length : 0) + ')</span>';
-                        tabBtn.onclick = function() {
-                            activeSheetIdx = idx;
-                            searchQuery = '';
-                            renderUI();
-                        };
-                        tabsBar.appendChild(tabBtn);
-                    });
-                    wrapper.appendChild(tabsBar);
-                }
-
                 var tableScroll = document.createElement('div');
                 tableScroll.className = 'excel-table-scroll';
                 wrapper.appendChild(tableScroll);
@@ -5752,121 +5882,245 @@ within any modern web browser without server communication.
 
                 function renderTable() {
                     tableScroll.innerHTML = '';
-                    var allRows = currentSheet.rows || [];
-                    var filtered = allRows;
 
-                    if (searchQuery.length > 0) {
-                        filtered = allRows.filter(function(r) {
-                            return (r || []).some(function(c) {
-                                var raw = (typeof c === 'object' && c !== null) ? c.v : String(c);
-                                return String(raw).toLowerCase().includes(searchQuery);
-                            });
-                        });
-                    }
+                    if (currentSheet.ws && xlsxEngine && xlsxEngine.utils && xlsxEngine.utils.sheet_to_html) {
+                        var ws = currentSheet.ws;
+                        var range = xlsxEngine.utils.decode_range(ws['!ref'] || 'A1:A1');
+                        var totalCols = Math.max(1, range.e.c - range.s.c + 1);
+                        var totalRows = Math.max(1, range.e.r - range.s.r + 1);
 
-                    if (filtered.length === 0) {
-                        tableScroll.innerHTML = '<div class="excel-empty-state">No matching rows found in this sheet for &quot;' + escapeHTML(searchQuery) + '&quot;.</div>';
-                        return;
-                    }
-
-                    var curMaxCols = 0;
-                    filtered.forEach(function(r) { if (r && r.length > curMaxCols) curMaxCols = r.length; });
-                    if (curMaxCols === 0) curMaxCols = 1;
-
-                    var table = document.createElement('table');
-                    table.className = 'excel-grid-table';
-                    table.style.fontSize = Math.round(12 * (currentZoom / 100)) + 'px';
-
-                    var thead = document.createElement('thead');
-                    var hdrTr = document.createElement('tr');
-                    var cornerTh = document.createElement('th');
-                    cornerTh.className = 'row-index-hdr';
-                    cornerTh.textContent = '#';
-                    hdrTr.appendChild(cornerTh);
-
-                    for (var c = 0; c < curMaxCols; c++) {
-                        var th = document.createElement('th');
-                        var colName = '';
-                        var temp = c;
-                        while (temp >= 0) {
-                            colName = String.fromCharCode(65 + (temp % 26)) + colName;
-                            temp = Math.floor(temp / 26) - 1;
+                        var tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = xlsxEngine.utils.sheet_to_html(ws, { id: 'excel-grid-table', header: '', footer: '' });
+                        var table = tempDiv.querySelector('table');
+                        if (!table) {
+                            tableScroll.innerHTML = '<div class="excel-empty-state">(Empty spreadsheet)</div>';
+                            return;
                         }
-                        th.textContent = colName;
-                        hdrTr.appendChild(th);
-                    }
-                    thead.appendChild(hdrTr);
-                    table.appendChild(thead);
+                        table.className = 'excel-grid-table';
+                        table.style.fontSize = Math.round(12 * (currentZoom / 100)) + 'px';
 
-                    var tbody = document.createElement('tbody');
-                    filtered.forEach(function(row, rIdx) {
-                        var tr = document.createElement('tr');
-                        var rowNumTd = document.createElement('td');
-                        rowNumTd.className = 'row-num';
-                        rowNumTd.textContent = (rIdx + 1);
-                        tr.appendChild(rowNumTd);
+                        // Colgroup with authentic column widths
+                        var colgroup = document.createElement('colgroup');
+                        var rowNumCol = document.createElement('col');
+                        rowNumCol.style.width = '46px';
+                        colgroup.appendChild(rowNumCol);
+                        for (var c = range.s.c; c <= range.e.c; c++) {
+                            var col = document.createElement('col');
+                            var colInfo = (ws['!cols'] || [])[c];
+                            var wPx = (colInfo && colInfo.wpx) ? colInfo.wpx : ((colInfo && colInfo.wch) ? Math.round(colInfo.wch * 8.5) : 100);
+                            col.style.width = Math.max(45, wPx) + 'px';
+                            colgroup.appendChild(col);
+                        }
+                        table.insertBefore(colgroup, table.firstChild);
 
-                        for (var c = 0; c < curMaxCols; c++) {
-                            var td = document.createElement('td');
-                            var cellData = (row && row[c] !== undefined) ? row[c] : '';
-                            var strVal = (typeof cellData === 'object' && cellData !== null) ? (cellData.v !== undefined ? cellData.v : '') : String(cellData);
-                            var formulaVal = (typeof cellData === 'object' && cellData !== null && cellData.f) ? cellData.f : strVal;
+                        // Thead with Column Letters (A, B, C, ...)
+                        var thead = document.createElement('thead');
+                        var hdrTr = document.createElement('tr');
+                        var cornerTh = document.createElement('th');
+                        cornerTh.className = 'row-index-hdr';
+                        cornerTh.textContent = '#';
+                        hdrTr.appendChild(cornerTh);
+                        for (var c = range.s.c; c <= range.e.c; c++) {
+                            var th = document.createElement('th');
+                            th.textContent = xlsxEngine.utils.encode_col(c);
+                            hdrTr.appendChild(th);
+                        }
+                        thead.appendChild(hdrTr);
+                        table.insertBefore(thead, colgroup.nextSibling || table.firstChild);
 
-                            td.textContent = strVal;
+                        // Inject Row Numbers (1, 2, 3, ...) and wire up cell interactions
+                        var trs = table.querySelectorAll('tbody tr, tr:not(thead tr)');
+                        trs.forEach(function(tr, rIdx) {
+                            var excelRowNum = range.s.r + rIdx + 1;
+                            var rowNumTd = document.createElement('td');
+                            rowNumTd.className = 'row-num';
+                            rowNumTd.textContent = String(excelRowNum);
+                            tr.insertBefore(rowNumTd, tr.firstChild);
 
-                            var trimmed = strVal.trim();
-                            if (trimmed !== '' && (!isNaN(Number(trimmed)) || (!isNaN(Date.parse(trimmed)) && trimmed.length > 5 && (trimmed.includes('/') || trimmed.includes('-'))))) {
-                                if (trimmed.includes('/') || trimmed.includes('-')) {
-                                    td.style.textAlign = 'center';
-                                } else {
-                                    td.style.textAlign = 'right';
+                            tr.querySelectorAll('td:not(.row-num)').forEach(function(td) {
+                                var cellCoord = td.id.replace(/^excel-grid-table-/, '').replace(/^sjs-/, '');
+                                var cell = ws[cellCoord];
+                                if (cell) {
+                                    if (cell.f) td.setAttribute('data-formula', '=' + cell.f);
+                                    if (cell.w) td.textContent = cell.w;
                                 }
-                            } else if (trimmed.startsWith('$') || trimmed.startsWith('€') || trimmed.startsWith('£') || trimmed.startsWith('₹') || trimmed.endsWith('%')) {
-                                td.style.textAlign = 'right';
-                            } else if (trimmed === 'TRUE' || trimmed === 'FALSE') {
-                                td.style.textAlign = 'center';
-                                td.style.fontWeight = '600';
-                            }
 
-                            if (searchQuery.length > 0 && strVal.toLowerCase().includes(searchQuery)) {
-                                td.classList.add('excel-search-match');
-                            }
+                                // Authentic Alignment
+                                var cellType = td.getAttribute('data-t');
+                                var txt = (td.textContent || '').trim();
+                                if (cellType === 'n' || (!isNaN(Number(txt)) && txt !== '') || txt.startsWith('$') || txt.startsWith('€') || txt.startsWith('£') || txt.startsWith('₹') || txt.endsWith('%')) {
+                                    td.style.textAlign = 'right';
+                                } else if (cellType === 'd' || cellType === 'b' || txt === 'TRUE' || txt === 'FALSE') {
+                                    td.style.textAlign = 'center';
+                                    if (txt === 'TRUE' || txt === 'FALSE') td.style.fontWeight = '600';
+                                } else {
+                                    td.style.textAlign = 'left';
+                                }
 
-                            // Interactive cell selection
-                            (function(colIdx, rowIdx, valText, formulaText, cellElement) {
-                                cellElement.onclick = function() {
-                                    var allActive = tableScroll.querySelectorAll('.excel-active-cell');
-                                    allActive.forEach(function(el) { el.classList.remove('excel-active-cell'); });
-                                    cellElement.classList.add('excel-active-cell');
+                                if (searchQuery.length > 0 && td.textContent.toLowerCase().includes(searchQuery)) {
+                                    td.classList.add('excel-search-match');
+                                }
 
-                                    var colLetter = '';
-                                    var tempC = colIdx;
-                                    while (tempC >= 0) {
-                                        colLetter = String.fromCharCode(65 + (tempC % 26)) + colLetter;
-                                        tempC = Math.floor(tempC / 26) - 1;
-                                    }
+                                td.onclick = function() {
+                                    tableScroll.querySelectorAll('.excel-active-cell').forEach(function(el) { el.classList.remove('excel-active-cell'); });
+                                    td.classList.add('excel-active-cell');
                                     var nameBox = wrapper.querySelector('#excel-name-box');
                                     var formulaInput = wrapper.querySelector('#excel-formula-input');
-                                    if (nameBox) nameBox.textContent = colLetter + (rowIdx + 1);
-                                    if (formulaInput) formulaInput.value = formulaText || valText;
+                                    if (nameBox) nameBox.textContent = cellCoord;
+                                    var fVal = td.getAttribute('data-formula') || td.textContent || '';
+                                    if (formulaInput) formulaInput.value = fVal;
                                 };
-                            })(c, rIdx, strVal, formulaVal, td);
+                            });
+                        });
 
-                            tr.appendChild(td);
+                        tableScroll.appendChild(table);
+
+                        var firstTd = table.querySelector('tbody td:not(.row-num), tr td:not(.row-num)');
+                        if (firstTd) firstTd.click();
+
+                    } else {
+                        // Fallback array rendering
+                        var allRows = currentSheet.rows || [];
+                        var filtered = allRows;
+
+                        if (searchQuery.length > 0) {
+                            filtered = allRows.filter(function(r) {
+                                return (r || []).some(function(c) {
+                                    var raw = (typeof c === 'object' && c !== null) ? c.v : String(c);
+                                    return String(raw).toLowerCase().includes(searchQuery);
+                                });
+                            });
                         }
-                        tbody.appendChild(tr);
-                    });
-                    table.appendChild(tbody);
-                    tableScroll.appendChild(table);
 
-                    // Auto-select first cell if present
-                    var firstTd = tbody.querySelector('td:not(.row-num)');
-                    if (firstTd && !wrapper.querySelector('.excel-active-cell')) {
-                        firstTd.click();
+                        if (filtered.length === 0) {
+                            tableScroll.innerHTML = '<div class="excel-empty-state">No matching rows found in this sheet for &quot;' + escapeHTML(searchQuery) + '&quot;.</div>';
+                            return;
+                        }
+
+                        var curMaxCols = 0;
+                        filtered.forEach(function(r) { if (r && r.length > curMaxCols) curMaxCols = r.length; });
+                        if (curMaxCols === 0) curMaxCols = 1;
+
+                        var table = document.createElement('table');
+                        table.className = 'excel-grid-table';
+                        table.style.fontSize = Math.round(12 * (currentZoom / 100)) + 'px';
+
+                        var thead = document.createElement('thead');
+                        var hdrTr = document.createElement('tr');
+                        var cornerTh = document.createElement('th');
+                        cornerTh.className = 'row-index-hdr';
+                        cornerTh.textContent = '#';
+                        hdrTr.appendChild(cornerTh);
+
+                        for (var c = 0; c < curMaxCols; c++) {
+                            var th = document.createElement('th');
+                            var colName = '';
+                            var temp = c;
+                            while (temp >= 0) {
+                                colName = String.fromCharCode(65 + (temp % 26)) + colName;
+                                temp = Math.floor(temp / 26) - 1;
+                            }
+                            th.textContent = colName;
+                            hdrTr.appendChild(th);
+                        }
+                        thead.appendChild(hdrTr);
+                        table.appendChild(thead);
+
+                        var tbody = document.createElement('tbody');
+                        filtered.forEach(function(row, rIdx) {
+                            var tr = document.createElement('tr');
+                            var rowNumTd = document.createElement('td');
+                            rowNumTd.className = 'row-num';
+                            rowNumTd.textContent = (rIdx + 1);
+                            tr.appendChild(rowNumTd);
+
+                            for (var c = 0; c < curMaxCols; c++) {
+                                var td = document.createElement('td');
+                                var cellData = (row && row[c] !== undefined) ? row[c] : '';
+                                var strVal = (typeof cellData === 'object' && cellData !== null) ? (cellData.v !== undefined ? cellData.v : '') : String(cellData);
+                                var formulaVal = (typeof cellData === 'object' && cellData !== null && cellData.f) ? cellData.f : strVal;
+
+                                td.textContent = strVal;
+
+                                var trimmed = strVal.trim();
+                                if (trimmed !== '' && (!isNaN(Number(trimmed)) || (!isNaN(Date.parse(trimmed)) && trimmed.length > 5 && (trimmed.includes('/') || trimmed.includes('-'))))) {
+                                    if (trimmed.includes('/') || trimmed.includes('-')) {
+                                        td.style.textAlign = 'center';
+                                    } else {
+                                        td.style.textAlign = 'right';
+                                    }
+                                } else if (trimmed.startsWith('$') || trimmed.startsWith('€') || trimmed.startsWith('£') || trimmed.startsWith('₹') || trimmed.endsWith('%')) {
+                                    td.style.textAlign = 'right';
+                                } else if (trimmed === 'TRUE' || trimmed === 'FALSE') {
+                                    td.style.textAlign = 'center';
+                                    td.style.fontWeight = '600';
+                                }
+
+                                if (searchQuery.length > 0 && strVal.toLowerCase().includes(searchQuery)) {
+                                    td.classList.add('excel-search-match');
+                                }
+
+                                (function(colIdx, rowIdx, valText, formulaText, cellElement) {
+                                    cellElement.onclick = function() {
+                                        var allActive = tableScroll.querySelectorAll('.excel-active-cell');
+                                        allActive.forEach(function(el) { el.classList.remove('excel-active-cell'); });
+                                        cellElement.classList.add('excel-active-cell');
+
+                                        var colLetter = '';
+                                        var tempC = colIdx;
+                                        while (tempC >= 0) {
+                                            colLetter = String.fromCharCode(65 + (tempC % 26)) + colLetter;
+                                            tempC = Math.floor(tempC / 26) - 1;
+                                        }
+                                        var nameBox = wrapper.querySelector('#excel-name-box');
+                                        var formulaInput = wrapper.querySelector('#excel-formula-input');
+                                        if (nameBox) nameBox.textContent = colLetter + (rowIdx + 1);
+                                        if (formulaInput) formulaInput.value = formulaText || valText;
+                                    };
+                                })(c, rIdx, strVal, formulaVal, td);
+
+                                tr.appendChild(td);
+                            }
+                            tbody.appendChild(tr);
+                        });
+                        table.appendChild(tbody);
+                        tableScroll.appendChild(table);
+
+                        var firstTd = tbody.querySelector('td:not(.row-num)');
+                        if (firstTd && !wrapper.querySelector('.excel-active-cell')) {
+                            firstTd.click();
+                        }
                     }
                 }
 
                 renderTable();
+
+                // Authentic Excel Bottom Bar: Sheet Tabs & Status
+                var bottomBar = document.createElement('div');
+                bottomBar.className = 'excel-bottom-bar';
+
+                var tabsList = document.createElement('div');
+                tabsList.className = 'excel-tabs-list';
+                sheets.forEach(function(sh, idx) {
+                    var tabBtn = document.createElement('button');
+                    tabBtn.type = 'button';
+                    tabBtn.className = 'excel-tab-item' + (idx === activeSheetIdx ? ' active' : '');
+                    tabBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg> ' + escapeHTML(sh.name);
+                    tabBtn.onclick = function() {
+                        activeSheetIdx = idx;
+                        searchQuery = '';
+                        renderUI();
+                    };
+                    tabsList.appendChild(tabBtn);
+                });
+                bottomBar.appendChild(tabsList);
+
+                var statusInfo = document.createElement('div');
+                statusInfo.className = 'excel-status-info';
+                statusInfo.textContent = 'Ready • ' + rCount + ' rows, ' + cCount + ' columns';
+                bottomBar.appendChild(statusInfo);
+
+                wrapper.appendChild(bottomBar);
             }
 
             renderUI();
@@ -9175,22 +9429,16 @@ function initCyberHackerEffects() {
           const y = drops[i] * fontSize;
 
           // Head of stream has neon laser glow, tail has cyber-cyan / green tint
+          // Rendered using direct high-efficiency GPU font colors without CPU shadowBlur bottlenecks
           const isLead = Math.random() > 0.88;
           if (isLead) {
             ctx.fillStyle = '#ffffff';
-            ctx.shadowColor = '#00f0ff';
-            ctx.shadowBlur = 10;
           } else if (i % 3 === 0) {
-            ctx.fillStyle = 'rgba(0, 240, 255, 0.65)';
-            ctx.shadowColor = '#00f0ff';
-            ctx.shadowBlur = 4;
+            ctx.fillStyle = 'rgba(0, 245, 255, 0.85)';
           } else if (i % 3 === 1) {
-            ctx.fillStyle = 'rgba(0, 255, 136, 0.55)';
-            ctx.shadowColor = '#00ff88';
-            ctx.shadowBlur = 3;
+            ctx.fillStyle = 'rgba(0, 255, 157, 0.75)';
           } else {
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
-            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.5)';
           }
 
           ctx.fillText(text, x, y);
@@ -9214,31 +9462,22 @@ function initCyberHackerEffects() {
       'HARDWARE ACCELERATION: ACTIVE // ZERO-KNOWLEDGE WEB CRYPTO RUNTIME ONLINE',
       'DUAL-STAGE KEY DERIVATION: HMAC-SHA512 + 2,000,000 PBKDF2 ROUNDS (V6 PEPPER)',
       'LOW-END HARDWARE OPTIMIZATION: ACTIVE // WORKER THREAD OFFLOAD ENFORCES 60FPS UI',
-      'ANTI-OFFLINE CRACKER: IMMUNE TO JOHN THE RIPPER, HASHCAT & GPU DICTIONARY CLUSTERS',
-      'AIR-GAPPED RUNTIME: ZERO REMOTE PACKETS DISPATCHED // IMMUNE TO BURP SUITE INTERCEPTION',
-      'ANTI-VIRUS MEMORY SANITIZATION: ACTIVE HEAP ZEROIZATION // ZERO DISK PERSISTENCE',
-      'CRYPTOGRAPHIC TAMPER DETECTION: SHA-256 PAYLOAD INTEGRITY SEAL ARMED',
-      'MIL-SPEC DEFENSE PROTOCOL: LEVEL-6 CLEARANCE // 128-BIT AUTHENTICATION TAG ARMED',
-      'STANDALONE PACKAGER: READY // OFFLINE ZERO-DEPENDENCY DECRYPTOR COMPLIANT',
-      'SYSTEM HEALTH: OPTIMAL // LOCAL STORAGE VAULT INTEGRITY 100% VERIFIED'
+      'STANDALONE ZERO-KNOWLEDGE RUNNER READY // IN-MEMORY SANDBOX DECRYPTION AVAILABLE'
     ];
-    let logIndex = 0;
+    let logIdx = 0;
     setInterval(() => {
-      logIndex = (logIndex + 1) % telemetryLogs.length;
+      logIdx = (logIdx + 1) % telemetryLogs.length;
       termStatus.style.opacity = '0';
-      termStatus.style.transform = 'translateY(4px)';
       setTimeout(() => {
-        termStatus.textContent = telemetryLogs[logIndex];
-        termStatus.style.transition = 'all 0.3s ease';
+        termStatus.textContent = telemetryLogs[logIdx];
         termStatus.style.opacity = '1';
-        termStatus.style.transform = 'translateY(0)';
       }, 300);
-    }, 4000);
+    }, 4500);
   }
 
-  // 3. Cyber Interactive Sparks on Button Clicks
-  document.addEventListener('click', (e) => {
-    const target = e.target.closest('.cyber-btn, .btn-icon, .cyber-nav-link, .cyber-drop-zone');
+  // 3. Cyber Click Ripples (Throttled for performance)
+  document.addEventListener('pointerdown', (e) => {
+    const target = e.target.closest('.cyber-btn, .cyber-nav-item, .cyber-tab');
     if (!target) return;
 
     const rect = target.getBoundingClientRect();
@@ -9250,30 +9489,36 @@ function initCyberHackerEffects() {
     target.appendChild(ripple);
 
     setTimeout(() => ripple.remove(), 600);
-  });
+  }, { passive: true });
 
-  // 4. Smooth Active Nav Observer for Mobile & Desktop
+  // 4. Ultra-Smooth Active Nav Observer for 120 FPS Scrolling (IntersectionObserver)
   const sections = [
     { el: document.getElementById('hero-command'), navId: 'nav-item-console' },
     { el: document.getElementById('inline-add-container'), navId: 'nav-item-protect' },
     { el: document.getElementById('secured-files-heading'), navId: 'nav-item-files' }
   ];
 
-  window.addEventListener('scroll', () => {
-    const scrollPos = window.scrollY + 180;
-    for (let i = sections.length - 1; i >= 0; i--) {
-      const item = sections[i];
-      if (item.el && item.el.offsetTop <= scrollPos) {
-        document.querySelectorAll('.cyber-nav-item').forEach(nav => {
-          if (nav.id === item.navId) {
-            nav.classList.add('active');
-          } else if (nav.id !== 'nav-item-settings') {
-            nav.classList.remove('active');
+  if ('IntersectionObserver' in window) {
+    const navObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const match = sections.find(s => s.el === entry.target);
+          if (match) {
+            document.querySelectorAll('.cyber-nav-item').forEach(nav => {
+              if (nav.id === match.navId) {
+                nav.classList.add('active');
+              } else if (nav.id !== 'nav-item-settings') {
+                nav.classList.remove('active');
+              }
+            });
           }
-        });
-        break;
-      }
-    }
-  }, { passive: true });
+        }
+      });
+    }, { rootMargin: '-15% 0px -65% 0px', threshold: 0.05 });
+
+    sections.forEach(item => {
+      if (item.el) navObserver.observe(item.el);
+    });
+  }
 }
 

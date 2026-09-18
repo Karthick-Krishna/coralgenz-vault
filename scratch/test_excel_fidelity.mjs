@@ -137,7 +137,30 @@ assert.ok(
   mainJsCode.includes('excel-formula-bar') && mainJsCode.includes('excel-name-box'),
   'Standalone runner must include excel-formula-bar and excel-name-box'
 );
-console.log('✓ Standalone universal runner contains embedded SheetJS parser and formula bar');
+assert.ok(
+  mainJsCode.includes('excel-bottom-bar') && mainJsCode.includes('excel-tabs-list'),
+  'Spreadsheet viewers must include authentic excel-bottom-bar and tabs list'
+);
+assert.ok(
+  mainJsCode.includes('sheet_to_html'),
+  'Spreadsheet viewers must utilize sheet_to_html for authentic cell and merge layout'
+);
+console.log('✓ Standalone universal runner contains embedded SheetJS parser, formula bar, and bottom tabs');
+
+// 4. Test merged cells (colspan/rowspan) with sheet_to_html
+const wbMerged = XLSX.utils.book_new();
+const wsMerged = XLSX.utils.aoa_to_sheet([
+  ['QUARTERLY CONSOLIDATED SUMMARY', null, null, null],
+  ['Region', 'Q1 Actual', 'Q2 Actual', 'Total'],
+  ['Global Operations', 50000, 60000, { f: 'B3+C3' }]
+]);
+wsMerged['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+wsMerged['!cols'] = [{ wpx: 200 }, { wpx: 120 }, { wpx: 120 }, { wpx: 120 }];
+const htmlMerged = XLSX.utils.sheet_to_html(wsMerged, { header: '', footer: '' });
+
+assert.ok(htmlMerged.includes('colspan="4"'), 'sheet_to_html must preserve merged header colspan=4');
+assert.ok(htmlMerged.includes('QUARTERLY CONSOLIDATED SUMMARY'), 'Merged cell text must be present');
+console.log('✓ Merged cells correctly preserved with colspan="4"');
 
 // Check font family styling in src/style.css
 const styleCssCode = fs.readFileSync(path.resolve('src/style.css'), 'utf8');
@@ -146,9 +169,13 @@ assert.ok(
   'style.css must contain .excel-formula-bar and .excel-active-cell styles'
 );
 assert.ok(
+  styleCssCode.includes('.excel-bottom-bar') && styleCssCode.includes('.excel-tab-item'),
+  'style.css must contain .excel-bottom-bar and .excel-tab-item styles'
+);
+assert.ok(
   !styleCssCode.match(/\.excel-table\s*\{[^}]*font-family:\s*var\(--font-mono\)/),
   '.excel-table should not be restricted to monospace font'
 );
-console.log('✓ CSS styles support interactive cell selection, formula bar, and native spreadsheet typography');
+console.log('✓ CSS styles support interactive cell selection, formula bar, bottom tabs, and native spreadsheet typography');
 
 console.log('\n>>> ALL EXCEL FIDELITY AND RENDERING TESTS PASSED SUCCESSFULLY! <<<');
